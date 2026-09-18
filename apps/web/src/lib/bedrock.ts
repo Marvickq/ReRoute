@@ -1,0 +1,383 @@
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { readFile } from "fs/promises";
+import path from "path";
+import type { Evidence, MaterialItem, HazardSignal, AnalysisResult } from "@/types";
+import { classifyUncertainty } from "./uncertainty";
+
+const MODEL_ID = process.env.AWS_BEDROCK_MODEL_ID || "anthropic.claude-3-5-sonnet-20241022-v2:0";
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+
+const ANALYSIS_PROMPT = `You are an e-waste material analysis system. Analyze the provided evidence (photos, text descriptions, voice transcriptions) and extract structured material intelligence.
+
+For each distinct item or device category observed, provide:
+- category: the device/material type (e.g., "laptop", "mobile_phone", "battery", "tablet", "monitor", "cable", "circuit_board", "charger", "other")
+- quantity: number of items of this type
+- condition: observed condition (e.g., "good", "damaged", "heavily_damaged", "unknown")
+- battery_present: whether a battery is present or associated with this item
+- components: notable components visible (e.g., ["screen", "keyboard", "ports"])
+- confidence: your confidence in this observation (0.0 to 1.0)
+- evidence_ids: which evidence items support this observation
+
+Also identify any potential hazard signals:
+- type: signal type (e.g., "possible_battery_swelling", "battery_damage", "exposed_components", "liquid_damage", "corrosion", "burn_marks")
+- confidence: confidence in this signal (0.0 to 1.0)
+- severity: estimated severity if applicable ("low", "medium", "high")
+- evidence_ids: which evidence items support this signal
+
+Rules:
+1. Every observation MUST reference at least one evidence_id from the provided evidence.
+2. Do NOT duplicate observations that describe the same item from multiple evidence sources.
+3. Use the evidence_ids exactly as provided in the input.
+4. Return ONLY valid JSON matching the schema below. No markdown, no explanation.
+5. If you cannot determine something with confidence, say "unknown" rather than guessing.
+
+Return JSON schema:
+{
+  "items": [
+    {
+      "category": "string",
+      "quantity": number,
+      "condition": "string",
+      "battery_present": boolean,
+      "components": ["string"],
+      "confidence": number,
+      "evidence_ids": ["string"]
+    }
+  ],
+  "hazard_signals": [
+    {
+      "type": "string",
+      "confidence": number,
+      "severity": "string" | null,
+      "evidence_ids": ["string"]
+    }
+  ]
+}`;
+
+interface BedrockAnalysisInput {
+  images: { data: string; mediaType: string; evidenceId: string }[];
+  textDescriptions: { text: string; evidenceId: string }[];
+}
+
+interface RawBedrockItem {
+  category?: string;
+  quantity?: number;
+  condition?: string;
+  battery_present?: boolean;
+  components?: string[];
+  confidence?: number;
+  evidence_ids?: string[];
+}
+
+interface RawBedrockHazard {
+  type?: string;
+  confidence?: number;
+  severity?: string | null;
+  evidence_ids?: string[];
+}
+
+interface RawBedrockResponse {
+  items?: RawBedrockItem[];
+  hazard_signals?: RawBedrockHazard[];
+}
+
+function isConfigured(): boolean {
+  return !!(
+    process.env.AWS_ACCESS_KEY_ID &&
+    process.env.AWS_SECRET_ACCESS_KEY &&
+    process.env.AWS_REGION
+  );
+}
+
+async function readEvidenceFiles(evidence: Evidence[]): Promise<BedrockAnalysisInput> {
+  const images: { data: string; mediaType: string; evidenceId: string }[] = [];
+  const textDescriptions: { text: string; evidenceId: string }[] = [];
+
+  for (const ev of evidence) {
+    if (ev.type === "photo") {
+      try {
+        const filePath = path.join(UPLOAD_DIR, ev.filename);
+        const buffer = await readFile(filePath);
+        images.push({
+          data: buffer.toString("base64"),
+          mediaType: ev.mime_type,
+          evidenceId: ev.evidence_id,
+        });
+      } catch {
+        console.warn(`Could not read image file: ${ev.filename}`);
+      }
+    }
+  }
+
+  return { images, textDescriptions };
+}
+
+function buildMessages(input: BedrockAnalysisInput, textDescription: string | null) {
+  const content: Array<
+    | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+    | { type: "text"; text: string }
+  > = [];
+
+  for (const img of input.images) {
+    content.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: img.mediaType,
+        data: img.data,
+      },
+    });
+  }
+
+  let userText = "Analyze the provided evidence and extract structured material intelligence.";
+  if (textDescription) {
+    userText += `\n\nText description from collector: "${textDescription}"`;
+  }
+  if (input.images.length > 0) {
+    const evidenceRefs = input.images.map((img) => img.evidenceId).join(", ");
+    userText += `\n\nEvidence IDs for reference: ${evidenceRefs}`;
+  }
+  userText += `\n\nReturn your analysis as JSON only.`;
+
+  content.push({ type: "text", text: userText });
+
+  return [
+    { role: "user", content },
+  ];
+}
+
+function validateAnalysis(data: unknown): data is RawBedrockResponse {
+  if (typeof data !== "object" || data === null) return false;
+  const obj = data as Record<string, unknown>;
+  if (obj.items !== undefined && !Array.isArray(obj.items)) return false;
+  if (obj.hazard_signals !== undefined && !Array.isArray(obj.hazard_signals)) return false;
+  return true;
+}
+
+function generateMockAnalysis(
+  evidence: Evidence[],
+  textDescription: string | null,
+  lotId: string
+): AnalysisResult {
+  const evidenceIds = evidence.filter((e) => e.type === "photo").map((e) => e.evidence_id);
+  const allIds = evidenceIds.length > 0 ? evidenceIds : ["mock-evidence"];
+
+  const items: MaterialItem[] = [];
+  const hazardSignals: HazardSignal[] = [];
+
+  if (textDescription) {
+    const lower = textDescription.toLowerCase();
+    if (lower.includes("laptop") || lower.includes("notebook")) {
+      const confidence = 0.85;
+      items.push({
+        item_id: `ITEM-${Date.now()}-1`,
+        lot_id: lotId,
+        category: "laptop",
+        quantity: 1,
+        condition: lower.includes("damage") || lower.includes("broken") ? "damaged" : "unknown",
+        battery_present: lower.includes("battery"),
+        components: [],
+        confidence,
+        uncertainty_level: classifyUncertainty(confidence),
+        evidence_ids: allIds,
+      });
+    }
+    if (lower.includes("phone")) {
+      const phoneMatch = lower.match(/(\d+)\s*(phone|mobile|cell)/);
+      const confidence = 0.82;
+      items.push({
+        item_id: `ITEM-${Date.now()}-2`,
+        lot_id: lotId,
+        category: "mobile_phone",
+        quantity: phoneMatch ? parseInt(phoneMatch[1]) : 1,
+        condition: "unknown",
+        battery_present: true,
+        components: [],
+        confidence,
+        uncertainty_level: classifyUncertainty(confidence),
+        evidence_ids: allIds,
+      });
+    }
+    if (lower.includes("battery")) {
+      const confidence = 0.88;
+      items.push({
+        item_id: `ITEM-${Date.now()}-3`,
+        lot_id: lotId,
+        category: "battery",
+        quantity: lower.match(/(\d+)\s*batter/)?.[1] ? parseInt(lower.match(/(\d+)\s*batter/)![1]) : 1,
+        condition: lower.includes("swollen") || lower.includes("swelling") ? "damaged" : "unknown",
+        battery_present: true,
+        components: [],
+        confidence,
+        uncertainty_level: classifyUncertainty(confidence),
+        evidence_ids: allIds,
+      });
+      if (lower.includes("swollen") || lower.includes("swelling")) {
+        const hzConfidence = 0.57;
+        hazardSignals.push({
+          signal_id: `HZ-${Date.now()}-1`,
+          lot_id: lotId,
+          type: "possible_battery_swelling",
+          confidence: hzConfidence,
+          uncertainty_level: classifyUncertainty(hzConfidence),
+          severity: "medium",
+          evidence_ids: allIds,
+          review_required: true,
+          verification_status: "pending",
+        });
+      }
+    }
+    if (lower.includes("tablet") || lower.includes("ipad")) {
+      const confidence = 0.75;
+      items.push({
+        item_id: `ITEM-${Date.now()}-4`,
+        lot_id: lotId,
+        category: "tablet",
+        quantity: 1,
+        condition: "unknown",
+        battery_present: true,
+        components: [],
+        confidence,
+        uncertainty_level: classifyUncertainty(confidence),
+        evidence_ids: allIds,
+      });
+    }
+  }
+
+  if (items.length === 0 && evidence.length > 0) {
+    const confidence = 0.5;
+    items.push({
+      item_id: `ITEM-${Date.now()}-1`,
+      lot_id: lotId,
+      category: "mixed_electronics",
+      quantity: evidence.length,
+      condition: "unknown",
+      battery_present: false,
+      components: [],
+      confidence,
+      uncertainty_level: classifyUncertainty(confidence),
+      evidence_ids: allIds,
+    });
+  }
+
+  return {
+    lot_id: lotId,
+    items,
+    hazard_signals: hazardSignals,
+    analyzed_at: new Date().toISOString(),
+    model_used: isConfigured() ? MODEL_ID : "mock-analysis",
+  };
+}
+
+function mapItems(raw: RawBedrockItem[], lotId: string, evidenceIds: string[]): MaterialItem[] {
+  return raw.map((item, i) => {
+    const confidence = typeof item.confidence === "number" ? Math.min(1, Math.max(0, item.confidence)) : 0.5;
+    return {
+      item_id: `ITEM-${Date.now()}-${i + 1}`,
+      lot_id: lotId,
+      category: typeof item.category === "string" ? item.category : "unknown",
+      quantity: typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1,
+      condition: typeof item.condition === "string" ? item.condition : null,
+      battery_present: typeof item.battery_present === "boolean" ? item.battery_present : false,
+      components: Array.isArray(item.components) ? item.components.filter((c): c is string => typeof c === "string") : [],
+      confidence,
+      uncertainty_level: classifyUncertainty(confidence),
+      evidence_ids: Array.isArray(item.evidence_ids) ? item.evidence_ids.filter((id): id is string => typeof id === "string" && evidenceIds.includes(id)) : evidenceIds,
+    };
+  });
+}
+
+function mapHazardSignals(raw: RawBedrockHazard[], lotId: string, evidenceIds: string[]): HazardSignal[] {
+  return raw.map((sig, i) => {
+    const confidence = typeof sig.confidence === "number" ? Math.min(1, Math.max(0, sig.confidence)) : 0.5;
+    return {
+      signal_id: `HZ-${Date.now()}-${i + 1}`,
+      lot_id: lotId,
+      type: typeof sig.type === "string" ? sig.type : "unknown_signal",
+      confidence,
+      uncertainty_level: classifyUncertainty(confidence),
+      severity: typeof sig.severity === "string" ? sig.severity : null,
+      evidence_ids: Array.isArray(sig.evidence_ids) ? sig.evidence_ids.filter((id): id is string => typeof id === "string" && evidenceIds.includes(id)) : evidenceIds,
+      review_required: confidence < 0.7,
+      verification_status: "pending" as const,
+    };
+  });
+}
+
+export async function analyzeLot(
+  evidence: Evidence[],
+  textDescription: string | null,
+  lotId: string
+): Promise<AnalysisResult> {
+  if (evidence.length === 0 && !textDescription) {
+    throw new Error("No evidence to analyze. At least one evidence item or text description is required.");
+  }
+
+  const evidenceIds = evidence.map((e) => e.evidence_id);
+
+  if (!isConfigured()) {
+    console.log("Bedrock not configured — using mock analysis");
+    return generateMockAnalysis(evidence, textDescription, lotId);
+  }
+
+  const input = await readEvidenceFiles(evidence);
+  const messages = buildMessages(input, textDescription);
+
+  const client = new BedrockRuntimeClient({
+    region: process.env.AWS_REGION,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    },
+  });
+
+  const command = new InvokeModelCommand({
+    modelId: MODEL_ID,
+    contentType: "application/json",
+    accept: "application/json",
+    body: JSON.stringify({
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 4096,
+      messages,
+      system: ANALYSIS_PROMPT,
+    }),
+  });
+
+  const response = await client.send(command);
+  const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+
+  const textContent = responseBody.content?.find(
+    (c: { type: string }) => c.type === "text"
+  );
+
+  if (!textContent?.text) {
+    throw new Error("No text content in Bedrock response");
+  }
+
+  let parsed: unknown;
+  try {
+    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : textContent.text);
+  } catch {
+    throw new Error("Failed to parse AI response as JSON");
+  }
+
+  if (!validateAnalysis(parsed)) {
+    throw new Error("AI response does not match expected schema");
+  }
+
+  const items = mapItems(parsed.items || [], lotId, evidenceIds);
+  const hazardSignals = mapHazardSignals(parsed.hazard_signals || [], lotId, evidenceIds);
+
+  if (items.length === 0 && hazardSignals.length === 0) {
+    throw new Error("AI analysis returned no items or hazard signals");
+  }
+
+  return {
+    lot_id: lotId,
+    items,
+    hazard_signals: hazardSignals,
+    analyzed_at: new Date().toISOString(),
+    model_used: MODEL_ID,
+  };
+}
