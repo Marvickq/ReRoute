@@ -13,6 +13,8 @@ import {
   ReviewQueueItem,
 } from "@/types";
 
+import { saveLotToDynamoDB, isDynamoDBConfigured } from "./dynamodb";
+
 // Use globalThis to persist stores across Next.js dev mode recompilations
 const globalStore = globalThis as typeof globalThis & {
   __reloop_lots?: Map<string, MaterialLot>;
@@ -35,6 +37,14 @@ const evidenceStore = globalStore.__reloop_evidence ?? (globalStore.__reloop_evi
 const analysisStore = globalStore.__reloop_analysis ?? (globalStore.__reloop_analysis = new Map<string, AnalysisResult>());
 const materialItemStore = globalStore.__reloop_materialItems ?? (globalStore.__reloop_materialItems = new Map<string, MaterialItem>());
 const hazardSignalStore = globalStore.__reloop_hazardSignals ?? (globalStore.__reloop_hazardSignals = new Map<string, HazardSignal>());
+
+function syncLotToCloud(lot: MaterialLot): void {
+  if (isDynamoDBConfigured()) {
+    saveLotToDynamoDB(lot).catch((err) =>
+      console.error(`[DynamoDB Sync Error] Failed to sync lot ${lot.lot_id}:`, err)
+    );
+  }
+}
 
 export function createLot(text: string | null, evidenceIds: string[]): MaterialLot {
   const lotId = nextLotId();
@@ -76,6 +86,7 @@ export function createLot(text: string | null, evidenceIds: string[]): MaterialL
   };
 
   lots.set(lotId, lot);
+  syncLotToCloud(lot);
   return lot;
 }
 
@@ -122,6 +133,7 @@ export function storeAnalysis(result: AnalysisResult): void {
     items_count: result.items.length,
     hazard_signals_count: result.hazard_signals.length,
   });
+  syncLotToCloud(lot);
 }
 
 export function getAnalysis(lotId: string): AnalysisResult | undefined {
@@ -144,6 +156,7 @@ export function storeSafetyResult(result: SafetyResult): void {
     blocked: result.blocked,
     requires_human_review: result.requires_human_review,
   });
+  syncLotToCloud(lot);
 }
 
 export function storeRoutingResult(result: RoutingResult): void {
@@ -157,6 +170,7 @@ export function storeRoutingResult(result: RoutingResult): void {
     recommended_facility_id: result.recommended_facility_id,
     routing_blocked: result.routing_blocked,
   });
+  syncLotToCloud(lot);
 }
 
 export function addEvent(
