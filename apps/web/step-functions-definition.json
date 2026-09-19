@@ -1,0 +1,107 @@
+{
+  "Comment": "ReRoute E-Waste Processing State Machine — AWS Hackathon Visual Workflow",
+  "StartAt": "UploadEvidenceToS3",
+  "States": {
+    "UploadEvidenceToS3": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::s3:putObject",
+      "Parameters": {
+        "Bucket.$": "$.s3_bucket",
+        "Key.$": "$.s3_key",
+        "Body.$": "$.evidence_payload"
+      },
+      "Next": "InvokeBedrockAIAnalysis",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "WorkflowFailed"
+        }
+      ]
+    },
+    "InvokeBedrockAIAnalysis": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock:invokeModel",
+      "Parameters": {
+        "ModelId": "us.amazon.nova-pro-v1:0",
+        "ContentType": "application/json",
+        "Accept": "application/json",
+        "Body": {
+          "prompt.$": "$.analysis_prompt",
+          "max_tokens": 2000
+        }
+      },
+      "ResultPath": "$.bedrock_output",
+      "Next": "EvaluateSafetyRules"
+    },
+    "EvaluateSafetyRules": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.bedrock_output.hazard_signals_count",
+          "NumericGreaterThan": 0,
+          "Next": "FlagHazardForReview"
+        }
+      ],
+      "Default": "CalculateFacilityRoute"
+    },
+    "FlagHazardForReview": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::events:putEvents",
+      "Parameters": {
+        "Entries": [
+          {
+            "EventBusName": "reroute-event-bus",
+            "Source": "reroute.ewaste",
+            "DetailType": "SafetyHazardFlagged",
+            "Detail.$": "States.JsonToString($)"
+          }
+        ]
+      },
+      "Next": "CalculateFacilityRoute"
+    },
+    "CalculateFacilityRoute": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ReRouteFacilityRouterFunction",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.routing_output",
+      "Next": "SaveToDynamoDB"
+    },
+    "SaveToDynamoDB": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "ReRoute_Lots",
+        "Item": {
+          "pk": { "S.$": "$.lot_id" },
+          "status": { "S": "analyzed" },
+          "updated_at": { "S.$": "$$.State.EnteredTime" }
+        }
+      },
+      "Next": "GenerateDigitalMaterialPassport"
+    },
+    "GenerateDigitalMaterialPassport": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "ReRoute_Passports",
+        "Item": {
+          "pk": { "S.$": "$.passport_id" },
+          "lot_id": { "S.$": "$.lot_id" },
+          "created_at": { "S.$": "$$.State.EnteredTime" }
+        }
+      },
+      "Next": "WorkflowCompleted"
+    },
+    "WorkflowCompleted": {
+      "Type": "Succeed"
+    },
+    "WorkflowFailed": {
+      "Type": "Fail",
+      "Error": "LotProcessingFailed",
+      "Cause": "An error occurred during multi-step lot processing."
+    }
+  }
+}

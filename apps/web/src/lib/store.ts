@@ -14,6 +14,8 @@ import {
 } from "@/types";
 
 import { saveLotToDynamoDB, isDynamoDBConfigured } from "./dynamodb";
+import { publishReRouteEvent } from "./events";
+import { startLotWorkflowInStepFunctions } from "./stepfunctions";
 
 // Use globalThis to persist stores across Next.js dev mode recompilations
 const globalStore = globalThis as typeof globalThis & {
@@ -87,6 +89,15 @@ export function createLot(text: string | null, evidenceIds: string[]): MaterialL
 
   lots.set(lotId, lot);
   syncLotToCloud(lot);
+  publishReRouteEvent("LotCreated", lotId, {
+    status: lot.status,
+    evidence_count: evidence.length,
+    text_description: text,
+  });
+  startLotWorkflowInStepFunctions(lotId, {
+    passport_id: passportId,
+    evidence_count: evidence.length,
+  });
   return lot;
 }
 
@@ -134,6 +145,11 @@ export function storeAnalysis(result: AnalysisResult): void {
     hazard_signals_count: result.hazard_signals.length,
   });
   syncLotToCloud(lot);
+  publishReRouteEvent("BedrockAnalysisCompleted", result.lot_id, {
+    model_used: result.model_used,
+    items_count: result.items.length,
+    hazard_signals_count: result.hazard_signals.length,
+  });
 }
 
 export function getAnalysis(lotId: string): AnalysisResult | undefined {
@@ -157,6 +173,13 @@ export function storeSafetyResult(result: SafetyResult): void {
     requires_human_review: result.requires_human_review,
   });
   syncLotToCloud(lot);
+  if (result.blocked || result.requires_human_review) {
+    publishReRouteEvent("SafetyHazardFlagged", result.lot_id, {
+      blocked: result.blocked,
+      requires_human_review: result.requires_human_review,
+      reasons: result.reasons,
+    });
+  }
 }
 
 export function storeRoutingResult(result: RoutingResult): void {
@@ -171,6 +194,10 @@ export function storeRoutingResult(result: RoutingResult): void {
     routing_blocked: result.routing_blocked,
   });
   syncLotToCloud(lot);
+  publishReRouteEvent("FacilityRouted", result.lot_id, {
+    recommended_facility_id: result.recommended_facility_id,
+    routing_blocked: result.routing_blocked,
+  });
 }
 
 export function addEvent(
