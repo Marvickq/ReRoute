@@ -1,25 +1,45 @@
 import { EventBridgeClient, PutEventsCommand } from "@aws-sdk/client-eventbridge";
 
-const REGION = process.env.AWS_REGION || "us-east-1";
-const EVENT_BUS_NAME = process.env.AWS_EVENTBRIDGE_BUS_NAME || "reroute-event-bus";
+function getEventBridgeConfig() {
+  const accessKeyId =
+    process.env.REROUTE_AWS_ACCESS_KEY_ID ||
+    process.env.MY_AWS_ACCESS_KEY_ID ||
+    process.env.AWS_ACCESS_KEY_ID ||
+    "";
+  const secretAccessKey =
+    process.env.REROUTE_AWS_SECRET_ACCESS_KEY ||
+    process.env.MY_AWS_SECRET_ACCESS_KEY ||
+    process.env.AWS_SECRET_ACCESS_KEY ||
+    "";
+  const region =
+    process.env.REROUTE_AWS_REGION ||
+    process.env.MY_AWS_REGION ||
+    process.env.AWS_REGION ||
+    "us-east-1";
+  const eventBusName =
+    process.env.REROUTE_AWS_EVENTBRIDGE_BUS_NAME ||
+    process.env.MY_AWS_EVENTBRIDGE_BUS_NAME ||
+    process.env.AWS_EVENTBRIDGE_BUS_NAME ||
+    "reroute-event-bus";
+
+  return { accessKeyId, secretAccessKey, region, eventBusName };
+}
 
 export function isEventBridgeConfigured(): boolean {
-  return !!(
-    process.env.AWS_ACCESS_KEY_ID &&
-    process.env.AWS_SECRET_ACCESS_KEY &&
-    process.env.AWS_EVENTBRIDGE_BUS_NAME
-  );
+  const { accessKeyId, secretAccessKey } = getEventBridgeConfig();
+  return !!(accessKeyId && secretAccessKey);
 }
 
 let eventBridgeClientInstance: EventBridgeClient | null = null;
 
 function getEventBridgeClient(): EventBridgeClient {
+  const { accessKeyId, secretAccessKey, region } = getEventBridgeConfig();
   if (!eventBridgeClientInstance) {
     eventBridgeClientInstance = new EventBridgeClient({
-      region: REGION,
+      region,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+        accessKeyId,
+        secretAccessKey,
       },
     });
   }
@@ -48,11 +68,12 @@ export async function publishReRouteEvent(
   }
 
   try {
+    const { eventBusName } = getEventBridgeConfig();
     const client = getEventBridgeClient();
     const command = new PutEventsCommand({
       Entries: [
         {
-          EventBusName: EVENT_BUS_NAME,
+          EventBusName: eventBusName,
           Source: "reroute.ewaste",
           DetailType: eventType,
           Detail: JSON.stringify({

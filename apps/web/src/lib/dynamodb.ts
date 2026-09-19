@@ -4,31 +4,54 @@ import {
   PutCommand,
   GetCommand,
   ScanCommand,
-  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import type { MaterialLot } from "@/types";
 
-const REGION = process.env.AWS_REGION || "us-east-1";
-const LOTS_TABLE = process.env.AWS_DYNAMODB_LOTS_TABLE || "ReRoute_Lots";
-const PASSPORTS_TABLE = process.env.AWS_DYNAMODB_PASSPORTS_TABLE || "ReRoute_Passports";
+function getDynamoConfig() {
+  const accessKeyId =
+    process.env.REROUTE_AWS_ACCESS_KEY_ID ||
+    process.env.MY_AWS_ACCESS_KEY_ID ||
+    process.env.AWS_ACCESS_KEY_ID ||
+    "";
+  const secretAccessKey =
+    process.env.REROUTE_AWS_SECRET_ACCESS_KEY ||
+    process.env.MY_AWS_SECRET_ACCESS_KEY ||
+    process.env.AWS_SECRET_ACCESS_KEY ||
+    "";
+  const region =
+    process.env.REROUTE_AWS_REGION ||
+    process.env.MY_AWS_REGION ||
+    process.env.AWS_REGION ||
+    "us-east-1";
+  const lotsTable =
+    process.env.REROUTE_AWS_DYNAMODB_LOTS_TABLE ||
+    process.env.MY_AWS_DYNAMODB_LOTS_TABLE ||
+    process.env.AWS_DYNAMODB_LOTS_TABLE ||
+    "ReRoute_Lots";
+  const passportsTable =
+    process.env.REROUTE_AWS_DYNAMODB_PASSPORTS_TABLE ||
+    process.env.MY_AWS_DYNAMODB_PASSPORTS_TABLE ||
+    process.env.AWS_DYNAMODB_PASSPORTS_TABLE ||
+    "ReRoute_Passports";
+
+  return { accessKeyId, secretAccessKey, region, lotsTable, passportsTable };
+}
 
 export function isDynamoDBConfigured(): boolean {
-  return !!(
-    process.env.AWS_ACCESS_KEY_ID &&
-    process.env.AWS_SECRET_ACCESS_KEY &&
-    process.env.AWS_DYNAMODB_LOTS_TABLE
-  );
+  const { accessKeyId, secretAccessKey } = getDynamoConfig();
+  return !!(accessKeyId && secretAccessKey);
 }
 
 let docClientInstance: DynamoDBDocumentClient | null = null;
 
 function getDocClient(): DynamoDBDocumentClient {
+  const { accessKeyId, secretAccessKey, region } = getDynamoConfig();
   if (!docClientInstance) {
     const rawClient = new DynamoDBClient({
-      region: REGION,
+      region,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+        accessKeyId,
+        secretAccessKey,
       },
     });
     docClientInstance = DynamoDBDocumentClient.from(rawClient, {
@@ -45,9 +68,10 @@ function getDocClient(): DynamoDBDocumentClient {
  * Saves or updates a MaterialLot in DynamoDB
  */
 export async function saveLotToDynamoDB(lot: MaterialLot): Promise<void> {
+  const { lotsTable } = getDynamoConfig();
   const client = getDocClient();
   const command = new PutCommand({
-    TableName: LOTS_TABLE,
+    TableName: lotsTable,
     Item: {
       ...lot,
       pk: lot.lot_id,
@@ -61,9 +85,10 @@ export async function saveLotToDynamoDB(lot: MaterialLot): Promise<void> {
  * Fetches a single MaterialLot from DynamoDB by ID
  */
 export async function getLotFromDynamoDB(lotId: string): Promise<MaterialLot | null> {
+  const { lotsTable } = getDynamoConfig();
   const client = getDocClient();
   const command = new GetCommand({
-    TableName: LOTS_TABLE,
+    TableName: lotsTable,
     Key: { pk: lotId },
   });
   const response = await client.send(command);
@@ -74,9 +99,10 @@ export async function getLotFromDynamoDB(lotId: string): Promise<MaterialLot | n
  * Fetches all MaterialLots from DynamoDB
  */
 export async function getAllLotsFromDynamoDB(): Promise<MaterialLot[]> {
+  const { lotsTable } = getDynamoConfig();
   const client = getDocClient();
   const command = new ScanCommand({
-    TableName: LOTS_TABLE,
+    TableName: lotsTable,
   });
   const response = await client.send(command);
   const items = (response.Items as MaterialLot[]) || [];
@@ -89,9 +115,10 @@ export async function getAllLotsFromDynamoDB(): Promise<MaterialLot[]> {
  * Saves a Digital Material Passport record to DynamoDB
  */
 export async function savePassportToDynamoDB(passportData: any): Promise<void> {
+  const { passportsTable } = getDynamoConfig();
   const client = getDocClient();
   const command = new PutCommand({
-    TableName: PASSPORTS_TABLE,
+    TableName: passportsTable,
     Item: {
       pk: passportData.passport_id,
       ...passportData,
@@ -105,9 +132,10 @@ export async function savePassportToDynamoDB(passportData: any): Promise<void> {
  * Fetches a Digital Material Passport from DynamoDB
  */
 export async function getPassportFromDynamoDB(passportId: string): Promise<any | null> {
+  const { passportsTable } = getDynamoConfig();
   const client = getDocClient();
   const command = new GetCommand({
-    TableName: PASSPORTS_TABLE,
+    TableName: passportsTable,
     Key: { pk: passportId },
   });
   const response = await client.send(command);

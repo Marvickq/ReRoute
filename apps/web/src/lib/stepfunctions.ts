@@ -1,25 +1,45 @@
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
 
-const REGION = process.env.AWS_REGION || "us-east-1";
-const STATE_MACHINE_ARN = process.env.AWS_STEP_FUNCTIONS_ARN || "";
+function getStepFunctionsConfig() {
+  const accessKeyId =
+    process.env.REROUTE_AWS_ACCESS_KEY_ID ||
+    process.env.MY_AWS_ACCESS_KEY_ID ||
+    process.env.AWS_ACCESS_KEY_ID ||
+    "";
+  const secretAccessKey =
+    process.env.REROUTE_AWS_SECRET_ACCESS_KEY ||
+    process.env.MY_AWS_SECRET_ACCESS_KEY ||
+    process.env.AWS_SECRET_ACCESS_KEY ||
+    "";
+  const region =
+    process.env.REROUTE_AWS_REGION ||
+    process.env.MY_AWS_REGION ||
+    process.env.AWS_REGION ||
+    "us-east-1";
+  const stateMachineArn =
+    process.env.REROUTE_AWS_STEP_FUNCTIONS_ARN ||
+    process.env.MY_AWS_STEP_FUNCTIONS_ARN ||
+    process.env.AWS_STEP_FUNCTIONS_ARN ||
+    "";
+
+  return { accessKeyId, secretAccessKey, region, stateMachineArn };
+}
 
 export function isStepFunctionsConfigured(): boolean {
-  return !!(
-    process.env.AWS_ACCESS_KEY_ID &&
-    process.env.AWS_SECRET_ACCESS_KEY &&
-    process.env.AWS_STEP_FUNCTIONS_ARN
-  );
+  const { accessKeyId, secretAccessKey, stateMachineArn } = getStepFunctionsConfig();
+  return !!(accessKeyId && secretAccessKey && stateMachineArn);
 }
 
 let sfnClientInstance: SFNClient | null = null;
 
 function getSFNClient(): SFNClient {
+  const { accessKeyId, secretAccessKey, region } = getStepFunctionsConfig();
   if (!sfnClientInstance) {
     sfnClientInstance = new SFNClient({
-      region: REGION,
+      region,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+        accessKeyId,
+        secretAccessKey,
       },
     });
   }
@@ -39,10 +59,11 @@ export async function startLotWorkflowInStepFunctions(
   }
 
   try {
+    const { stateMachineArn } = getStepFunctionsConfig();
     const client = getSFNClient();
     const executionName = `LotWorkflow-${lotId}-${Date.now()}`;
     const command = new StartExecutionCommand({
-      stateMachineArn: STATE_MACHINE_ARN,
+      stateMachineArn,
       name: executionName,
       input: JSON.stringify({
         lot_id: lotId,

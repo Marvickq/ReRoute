@@ -4,7 +4,11 @@ import path from "path";
 import type { Evidence, MaterialItem, HazardSignal, AnalysisResult } from "@/types";
 import { classifyUncertainty } from "./uncertainty";
 
-const MODEL_ID = process.env.AWS_BEDROCK_MODEL_ID || "us.amazon.nova-pro-v1:0";
+const MODEL_ID =
+  process.env.REROUTE_AWS_BEDROCK_MODEL_ID ||
+  process.env.MY_AWS_BEDROCK_MODEL_ID ||
+  process.env.AWS_BEDROCK_MODEL_ID ||
+  "us.amazon.nova-pro-v1:0";
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
 const ANALYSIS_PROMPT = `You are an e-waste material analysis system. Analyze the provided evidence (photos, text descriptions, voice transcriptions) and extract structured material intelligence.
@@ -81,12 +85,28 @@ interface RawBedrockResponse {
   hazard_signals?: RawBedrockHazard[];
 }
 
+function getAwsCredentials() {
+  const accessKeyId =
+    process.env.REROUTE_AWS_ACCESS_KEY_ID ||
+    process.env.MY_AWS_ACCESS_KEY_ID ||
+    process.env.AWS_ACCESS_KEY_ID ||
+    "";
+  const secretAccessKey =
+    process.env.REROUTE_AWS_SECRET_ACCESS_KEY ||
+    process.env.MY_AWS_SECRET_ACCESS_KEY ||
+    process.env.AWS_SECRET_ACCESS_KEY ||
+    "";
+  const region =
+    process.env.REROUTE_AWS_REGION ||
+    process.env.MY_AWS_REGION ||
+    process.env.AWS_REGION ||
+    "us-east-1";
+  return { accessKeyId, secretAccessKey, region };
+}
+
 function isConfigured(): boolean {
-  return !!(
-    process.env.AWS_ACCESS_KEY_ID &&
-    process.env.AWS_SECRET_ACCESS_KEY &&
-    process.env.AWS_REGION
-  );
+  const { accessKeyId, secretAccessKey, region } = getAwsCredentials();
+  return !!(accessKeyId && secretAccessKey && region);
 }
 
 async function readEvidenceFiles(evidence: Evidence[]): Promise<BedrockAnalysisInput> {
@@ -385,11 +405,12 @@ export async function analyzeLot(
     });
   }
 
+  const { accessKeyId, secretAccessKey, region } = getAwsCredentials();
   const client = new BedrockRuntimeClient({
-    region: process.env.AWS_REGION,
+    region,
     credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      accessKeyId,
+      secretAccessKey,
     },
   });
 
