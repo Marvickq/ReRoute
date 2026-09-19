@@ -13,18 +13,28 @@ import {
   ReviewQueueItem,
 } from "@/types";
 
-let lotCounter = 1000;
+// Use globalThis to persist stores across Next.js dev mode recompilations
+const globalStore = globalThis as typeof globalThis & {
+  __reloop_lots?: Map<string, MaterialLot>;
+  __reloop_evidence?: Map<string, Evidence>;
+  __reloop_analysis?: Map<string, AnalysisResult>;
+  __reloop_materialItems?: Map<string, MaterialItem>;
+  __reloop_hazardSignals?: Map<string, HazardSignal>;
+  __reloop_lotCounter?: number;
+};
+
+if (!globalStore.__reloop_lotCounter) globalStore.__reloop_lotCounter = 1000;
 
 function nextLotId(): string {
-  lotCounter++;
-  return `RL-${lotCounter}`;
+  globalStore.__reloop_lotCounter = (globalStore.__reloop_lotCounter || 1000) + 1;
+  return `RL-${globalStore.__reloop_lotCounter}`;
 }
 
-const lots = new Map<string, MaterialLot>();
-const evidenceStore = new Map<string, Evidence>();
-const analysisStore = new Map<string, AnalysisResult>();
-const materialItemStore = new Map<string, MaterialItem>();
-const hazardSignalStore = new Map<string, HazardSignal>();
+const lots = globalStore.__reloop_lots ?? (globalStore.__reloop_lots = new Map<string, MaterialLot>());
+const evidenceStore = globalStore.__reloop_evidence ?? (globalStore.__reloop_evidence = new Map<string, Evidence>());
+const analysisStore = globalStore.__reloop_analysis ?? (globalStore.__reloop_analysis = new Map<string, AnalysisResult>());
+const materialItemStore = globalStore.__reloop_materialItems ?? (globalStore.__reloop_materialItems = new Map<string, MaterialItem>());
+const hazardSignalStore = globalStore.__reloop_hazardSignals ?? (globalStore.__reloop_hazardSignals = new Map<string, HazardSignal>());
 
 export function createLot(text: string | null, evidenceIds: string[]): MaterialLot {
   const lotId = nextLotId();

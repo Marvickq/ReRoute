@@ -40,6 +40,7 @@ export async function POST(
   try {
     const result = await analyzeLot(lot.evidence, lot.text_description, id);
     storeAnalysis(result);
+    lot.status = "analyzed";
 
     const allVerified = areAllRequiredObservationsVerified(lot);
     if (allVerified) {

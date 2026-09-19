@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -9,6 +9,7 @@ import EmptyState from "@/components/EmptyState";
 import type { MaterialLot } from "@/types";
 
 export default function LotsPage() {
+  const router = useRouter();
   const [lots, setLots] = useState<MaterialLot[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -80,33 +81,39 @@ export default function LotsPage() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[#2a2a2a]">
-                  <th className="text-left px-4 py-2.5 text-[11px] text-[#666] uppercase tracking-wider font-medium">Lot ID</th>
-                  <th className="text-left px-4 py-2.5 text-[11px] text-[#666] uppercase tracking-wider font-medium">Status</th>
-                  <th className="text-left px-4 py-2.5 text-[11px] text-[#666] uppercase tracking-wider font-medium">Evidence</th>
-                  <th className="text-left px-4 py-2.5 text-[11px] text-[#666] uppercase tracking-wider font-medium">Description</th>
-                  <th className="text-left px-4 py-2.5 text-[11px] text-[#666] uppercase tracking-wider font-medium">Created</th>
+                <tr className="border-b border-[#2a2a2a] bg-[#0d0d0d]">
+                  <th className="px-4 py-3 text-[11px] text-[#888] uppercase tracking-wider font-semibold w-[140px]">Lot ID</th>
+                  <th className="px-4 py-3 text-[11px] text-[#888] uppercase tracking-wider font-semibold w-[160px]">Status</th>
+                  <th className="px-4 py-3 text-[11px] text-[#888] uppercase tracking-wider font-semibold w-[120px]">Evidence</th>
+                  <th className="px-4 py-3 text-[11px] text-[#888] uppercase tracking-wider font-semibold">Description</th>
+                  <th className="px-4 py-3 text-[11px] text-[#888] uppercase tracking-wider font-semibold w-[200px] text-right">Created</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2a2a2a]">
                 {filtered.map((lot) => (
-                  <Link key={lot.lot_id} href={`/lots/${lot.lot_id}`}>
-                    <tr className="hover:bg-[#1a1a1a] transition-colors cursor-pointer">
-                      <td className="px-4 py-3 text-[13px] font-mono text-[#f0f0f0]">{lot.lot_id}</td>
-                      <td className="px-4 py-3"><StatusBadge status={lot.status} /></td>
-                      <td className="px-4 py-3 text-[13px] text-[#a0a0a0]">
-                        {lot.evidence.length} {lot.evidence.length === 1 ? "item" : "items"}
-                      </td>
-                      <td className="px-4 py-3 text-[12px] text-[#666] max-w-[200px] truncate">
-                        {lot.text_description || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-[12px] text-[#666] font-mono">
-                        {new Date(lot.created_at).toLocaleString()}
-                      </td>
-                    </tr>
-                  </Link>
+                  <tr
+                    key={lot.lot_id}
+                    onClick={() => router.push(`/lots/${lot.lot_id}`)}
+                    className="hover:bg-[#1a1a1a] transition-colors cursor-pointer group"
+                  >
+                    <td className="px-4 py-3 text-[13px] font-mono text-[#f0f0f0] group-hover:text-[#3b82f6] transition-colors">
+                      {lot.lot_id}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={lot.status} />
+                    </td>
+                    <td className="px-4 py-3 text-[13px] text-[#a0a0a0]">
+                      {lot.evidence.length} {lot.evidence.length === 1 ? "item" : "items"}
+                    </td>
+                    <td className="px-4 py-3 text-[12px] text-[#888] max-w-[300px] truncate">
+                      {lot.text_description || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-[12px] text-[#666] font-mono text-right">
+                      {new Date(lot.created_at).toLocaleString()}
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>

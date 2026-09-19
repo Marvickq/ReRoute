@@ -4,7 +4,7 @@ import path from "path";
 import type { Evidence, MaterialItem, HazardSignal, AnalysisResult } from "@/types";
 import { classifyUncertainty } from "./uncertainty";
 
-const MODEL_ID = process.env.AWS_BEDROCK_MODEL_ID || "anthropic.claude-3-5-sonnet-20241022-v2:0";
+const MODEL_ID = process.env.AWS_BEDROCK_MODEL_ID || "us.amazon.nova-pro-v1:0";
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
 const ANALYSIS_PROMPT = `You are an e-waste material analysis system. Analyze the provided evidence (photos, text descriptions, voice transcriptions) and extract structured material intelligence.
@@ -141,9 +141,44 @@ function buildMessages(input: BedrockAnalysisInput, textDescription: string | nu
 
   content.push({ type: "text", text: userText });
 
-  return [
-    { role: "user", content },
-  ];
+  return [{ role: "user", content }];
+}
+
+function buildNovaMessages(input: BedrockAnalysisInput, textDescription: string | null) {
+  const content: Array<
+    | { image: { format: string; source: { bytes: string } } }
+    | { text: string }
+  > = [];
+
+  for (const img of input.images) {
+    let format = "jpeg";
+    if (img.mediaType.includes("png")) format = "png";
+    else if (img.mediaType.includes("webp")) format = "webp";
+    else if (img.mediaType.includes("gif")) format = "gif";
+
+    content.push({
+      image: {
+        format,
+        source: {
+          bytes: img.data,
+        },
+      },
+    });
+  }
+
+  let userText = "Analyze the provided evidence and extract structured material intelligence.";
+  if (textDescription) {
+    userText += `\n\nText description from collector: "${textDescription}"`;
+  }
+  if (input.images.length > 0) {
+    const evidenceRefs = input.images.map((img) => img.evidenceId).join(", ");
+    userText += `\n\nEvidence IDs for reference: ${evidenceRefs}`;
+  }
+  userText += `\n\nReturn your analysis as JSON only.`;
+
+  content.push({ text: userText });
+
+  return [{ role: "user", content }];
 }
 
 function validateAnalysis(data: unknown): data is RawBedrockResponse {
@@ -269,11 +304,17 @@ function generateMockAnalysis(
   };
 }
 
+function generateId(prefix: string, index: number): string {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  return `${prefix}-${timestamp}-${index + 1}-${random}`;
+}
+
 function mapItems(raw: RawBedrockItem[], lotId: string, evidenceIds: string[]): MaterialItem[] {
   return raw.map((item, i) => {
-    const confidence = typeof item.confidence === "number" ? Math.min(1, Math.max(0, item.confidence)) : 0.5;
+    const confidence = typeof item.confidence === "number" ? Math.min(1, Math.max(0, item.confidence)) : 0.8;
     return {
-      item_id: `ITEM-${Date.now()}-${i + 1}`,
+      item_id: generateId("ITEM", i),
       lot_id: lotId,
       category: typeof item.category === "string" ? item.category : "unknown",
       quantity: typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1,
@@ -289,9 +330,9 @@ function mapItems(raw: RawBedrockItem[], lotId: string, evidenceIds: string[]): 
 
 function mapHazardSignals(raw: RawBedrockHazard[], lotId: string, evidenceIds: string[]): HazardSignal[] {
   return raw.map((sig, i) => {
-    const confidence = typeof sig.confidence === "number" ? Math.min(1, Math.max(0, sig.confidence)) : 0.5;
+    const confidence = typeof sig.confidence === "number" ? Math.min(1, Math.max(0, sig.confidence)) : 0.8;
     return {
-      signal_id: `HZ-${Date.now()}-${i + 1}`,
+      signal_id: generateId("HZ", i),
       lot_id: lotId,
       type: typeof sig.type === "string" ? sig.type : "unknown_signal",
       confidence,
@@ -321,7 +362,28 @@ export async function analyzeLot(
   }
 
   const input = await readEvidenceFiles(evidence);
-  const messages = buildMessages(input, textDescription);
+  const isNova = MODEL_ID.includes("nova");
+
+  let commandBody: string;
+  if (isNova) {
+    const messages = buildNovaMessages(input, textDescription);
+    commandBody = JSON.stringify({
+      system: [{ text: ANALYSIS_PROMPT }],
+      messages,
+      inferenceConfig: {
+        maxTokens: 4096,
+        temperature: 0.1,
+      },
+    });
+  } else {
+    const messages = buildMessages(input, textDescription);
+    commandBody = JSON.stringify({
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 4096,
+      messages,
+      system: ANALYSIS_PROMPT,
+    });
+  }
 
   const client = new BedrockRuntimeClient({
     region: process.env.AWS_REGION,
@@ -335,29 +397,27 @@ export async function analyzeLot(
     modelId: MODEL_ID,
     contentType: "application/json",
     accept: "application/json",
-    body: JSON.stringify({
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 4096,
-      messages,
-      system: ANALYSIS_PROMPT,
-    }),
+    body: commandBody,
   });
 
   const response = await client.send(command);
   const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
-  const textContent = responseBody.content?.find(
-    (c: { type: string }) => c.type === "text"
-  );
+  let rawText = "";
+  if (isNova) {
+    rawText = responseBody.output?.message?.content?.find((c: { text?: string }) => typeof c.text === "string")?.text || "";
+  } else {
+    rawText = responseBody.content?.find((c: { type: string; text?: string }) => c.type === "text")?.text || "";
+  }
 
-  if (!textContent?.text) {
+  if (!rawText) {
     throw new Error("No text content in Bedrock response");
   }
 
   let parsed: unknown;
   try {
-    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
-    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : textContent.text);
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
   } catch {
     throw new Error("Failed to parse AI response as JSON");
   }
@@ -381,3 +441,4 @@ export async function analyzeLot(
     model_used: MODEL_ID,
   };
 }
+

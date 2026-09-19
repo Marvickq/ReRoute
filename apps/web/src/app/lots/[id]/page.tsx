@@ -77,10 +77,10 @@ export default function LotDetailPage() {
         prev
           ? {
               ...prev,
-              status: data.routing.recommended_facility_id && !data.routing.routing_blocked ? "routed" : data.safety.blocked ? "blocked" : "routing",
-              safety_result: data.safety,
-              routing_result: data.routing,
-              selected_facility_id: data.routing.recommended_facility_id,
+              status: data.routing?.recommended_facility_id && !data.routing?.routing_blocked ? "routed" : data.safety?.blocked ? "blocked" : "routing",
+              safety_result: data.safety ?? null,
+              routing_result: data.routing ?? null,
+              selected_facility_id: data.routing?.recommended_facility_id ?? null,
             }
           : prev
       );

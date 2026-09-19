@@ -30,7 +30,7 @@ See `.env.example`. Required for AWS Bedrock integration:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_REGION`
-- `AWS_BEDROCK_MODEL_ID` (optional, defaults to `anthropic.claude-3-5-sonnet-20241022-v2:0`)
+- `AWS_BEDROCK_MODEL_ID` (optional, defaults to `anthropic.claude-sonnet-4-6`)
 
 **Without AWS credentials**, the system runs in mock mode with simulated analysis results.
 
@@ -63,7 +63,6 @@ apps/web/src/
 
 The IAM user needs:
 - `AmazonBedrockFullAccess` (or custom policy with `bedrock:InvokeModel`)
-- `BedrockAgentCoreRuntime` if using agents
 
 ### AWS Credentials
 
