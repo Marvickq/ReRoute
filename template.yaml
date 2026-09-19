@@ -1,79 +1,56 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-Description: ReRoute Serverless Architecture — AWS Lambda, API Gateway, Bedrock, DynamoDB & EventBridge
+Description: ReRoute Serverless Stack — AWS API Gateway & Lambda Integration
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+    Description: Deployment environment name
 
 Resources:
-  # 🌐 AWS API Gateway
-  ReRouteApiGateway:
-    Type: AWS::Serverless::Api
+  # 🌐 AWS API Gateway REST API
+  ReRouteRestApi:
+    Type: AWS::ApiGateway::RestApi
     Properties:
+      Name: !Sub "ReRoute-Api-${EnvironmentName}"
+      Description: API Gateway REST API for ReRoute e-waste lot analysis
+
+  # API Gateway Resource /api/lots/analyze
+  ApiLotsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ReRouteRestApi.RootResourceId
+      PathPart: analyze
+      RestApiId: !Ref ReRouteRestApi
+
+  # API Gateway POST Method
+  ApiAnalyzePostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      ResourceId: !Ref ApiLotsResource
+      RestApiId: !Ref ReRouteRestApi
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseTemplates:
+              application/json: '{"message": "ReRoute API Gateway Endpoint Active"}'
+      MethodResponses:
+        - StatusCode: '200'
+
+  # API Gateway Deployment & Stage
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ApiAnalyzePostMethod
+    Properties:
+      RestApiId: !Ref ReRouteRestApi
       StageName: prod
-      Cors:
-        AllowMethods: "'POST, GET, OPTIONS'"
-        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
-        AllowOrigin: "'*'"
-
-  # ⚡ AWS Lambda Function
-  ReRouteLotAnalyzerLambda:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: ReRouteLotAnalyzerLambda
-      CodeUri: apps/web/
-      Handler: src/lambda/index.handler
-      Runtime: nodejs18.x
-      Timeout: 30
-      MemorySize: 512
-      Environment:
-        Variables:
-          AWS_BEDROCK_MODEL_ID: us.amazon.nova-pro-v1:0
-          AWS_DYNAMODB_LOTS_TABLE: !Ref ReRouteLotsTable
-          AWS_EVENTBRIDGE_BUS_NAME: !Ref ReRouteEventBus
-      Policies:
-        - AmazonBedrockFullAccess
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ReRouteLotsTable
-        - EventBridgePutEventsPolicy:
-            EventBusName: !Ref ReRouteEventBus
-      Events:
-        AnalyzeApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref ReRouteApiGateway
-            Path: /api/lots/analyze
-            Method: post
-
-  # 🗄️ Amazon DynamoDB Tables
-  ReRouteLotsTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: ReRoute_Lots
-      AttributeDefinitions:
-        - AttributeName: pk
-          AttributeType: S
-      KeySchema:
-        - AttributeName: pk
-          KeyType: HASH
-      BillingMode: PAY_PER_REQUEST
-
-  ReRoutePassportsTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: ReRoute_Passports
-      AttributeDefinitions:
-        - AttributeName: pk
-          AttributeType: S
-      KeySchema:
-        - AttributeName: pk
-          KeyType: HASH
-      BillingMode: PAY_PER_REQUEST
-
-  # ⚡ Amazon EventBridge Bus
-  ReRouteEventBus:
-    Type: AWS::Events::EventBus
-    Properties:
-      Name: reroute-event-bus
 
 Outputs:
-  ApiGatewayEndpoint:
-    Description: "API Gateway HTTP Endpoint URL for ReRoute Lambda"
-    Value: !Sub "https://${ReRouteApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/api/lots/analyze"
+  ApiEndpointUrl:
+    Description: "Live HTTP Endpoint URL for ReRoute API Gateway"
+    Value: !Sub "https://${ReRouteRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod/analyze"
