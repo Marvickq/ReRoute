@@ -177,7 +177,7 @@ export function storeSafetyResult(result: SafetyResult): void {
     publishReRouteEvent("SafetyHazardFlagged", result.lot_id, {
       blocked: result.blocked,
       requires_human_review: result.requires_human_review,
-      reasons: result.reasons,
+      blocking_reasons: result.blocking_reasons,
     });
   }
 }
