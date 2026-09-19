@@ -56,13 +56,21 @@ export default function PassportPage() {
 
   return (
     <AppShell title="Material Passport">
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <Link
           href={`/lots/${lotId}`}
-          className="text-[12px] text-[#3b82f6] hover:text-[#60a5fa] transition-colors"
+          className="text-[12px] text-[#3b82f6] hover:text-[#60a5fa] transition-colors font-medium"
         >
           ← Back to lot {lotId}
         </Link>
+        <a
+          href={`/api/lots/${lotId}/passport/download`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 bg-[#16a34a] text-white rounded-md text-[12px] font-semibold hover:bg-[#15803d] transition-colors flex items-center gap-1.5"
+        >
+          🖨️ Download Passport PDF / Print
+        </a>
       </div>
 
       {/* Passport Header */}

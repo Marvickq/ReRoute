@@ -159,12 +159,32 @@ export default function LotDetailPage() {
         }
         description={`Created ${new Date(lot.created_at).toLocaleString()}`}
         action={
-          <Link
-            href="/lots"
-            className="px-3 py-1.5 bg-[#222] border border-[#333] rounded-md text-[12px] text-[#a0a0a0] hover:bg-[#2a2a2a] transition-colors"
-          >
-            Back to lots
-          </Link>
+          <div className="flex items-center gap-2">
+            {(lot.analysis || lot.passport_id) && (
+              <>
+                <Link
+                  href={`/lots/${lot.lot_id}/passport`}
+                  className="px-3 py-1.5 bg-[#14532d]/40 border border-[#22c55e]/50 rounded-md text-[12px] font-medium text-[#22c55e] hover:bg-[#14532d]/70 transition-colors flex items-center gap-1.5"
+                >
+                  📄 View Passport
+                </Link>
+                <a
+                  href={`/api/lots/${lot.lot_id}/passport/download`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-[#1e3a5f]/60 border border-[#3b82f6]/50 rounded-md text-[12px] font-medium text-[#60a5fa] hover:bg-[#1e3a5f] transition-colors flex items-center gap-1.5"
+                >
+                  📥 Download PDF
+                </a>
+              </>
+            )}
+            <Link
+              href="/lots"
+              className="px-3 py-1.5 bg-[#222] border border-[#333] rounded-md text-[12px] text-[#a0a0a0] hover:bg-[#2a2a2a] transition-colors"
+            >
+              Back to lots
+            </Link>
+          </div>
         }
       />
 
@@ -876,16 +896,22 @@ function RoutingResultCard({ routing, facilities }: { routing: RoutingResult; fa
         </div>
       )}
 
-      {routing.recommended_facility_id && !routing.routing_blocked && (
-        <div className="pt-2 border-t border-[#2a2a2a]">
-          <a
-            href={`/lots/${routing.lot_id}/passport`}
-            className="text-[12px] text-[#3b82f6] hover:text-[#60a5fa] transition-colors"
-          >
-            View Material Passport →
-          </a>
-        </div>
-      )}
+      <div className="pt-2 border-t border-[#2a2a2a] flex items-center justify-between">
+        <a
+          href={`/lots/${routing.lot_id}/passport`}
+          className="text-[12px] text-[#3b82f6] hover:text-[#60a5fa] transition-colors font-medium flex items-center gap-1"
+        >
+          📄 View Digital Material Passport →
+        </a>
+        <a
+          href={`/api/lots/${routing.lot_id}/passport/download`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] text-[#22c55e] hover:text-[#4ade80] transition-colors bg-[#052e16] px-2 py-1 rounded border border-[#14532d]"
+        >
+          📥 Download PDF
+        </a>
+      </div>
     </div>
   );
 }
