@@ -7,3 +7,12 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
+    envVars:
+      - key: MY_AWS_ACCESS_KEY_ID
+        sync: false
+      - key: MY_AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: MY_AWS_REGION
+        value: us-east-1
+      - key: MY_AWS_BEDROCK_MODEL_ID
+        value: us.amazon.nova-pro-v1:0
