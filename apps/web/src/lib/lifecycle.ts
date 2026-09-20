@@ -167,18 +167,16 @@ function handleUnblock(lot: MaterialLot, metadata: Record<string, unknown>): Tra
     lot.safety_result.blocking_reasons = [];
   }
 
-  // Resolve any inconclusive verifications to confirmed with inspector override note
+  // When inspector executes unblock override, mark blocking hazard verifications as rejected (cleared)
   for (const v of lot.verifications) {
-    if (v.decision === "cannot_determine") {
-      v.decision = "confirmed";
+    if (v.target_type === "hazard") {
+      v.decision = "rejected";
       v.note = (v.note ? `${v.note} ` : "") + "(Cleared via physical inspector override)";
     }
   }
 
   for (const signal of lot.hazard_signals) {
-    if (signal.verification_status === "cannot_determine") {
-      signal.verification_status = "confirmed";
-    }
+    signal.verification_status = "rejected";
   }
 
   const targetStatus: LotStatus = "verified";
