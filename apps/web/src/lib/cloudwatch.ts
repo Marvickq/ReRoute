@@ -89,12 +89,37 @@ export async function logToCloudWatch(
     await client.send(command);
     console.log(`[Amazon CloudWatch] Logged event to stream ${logStreamName}`);
   } catch (err: any) {
-    // If stream doesn't exist, attempt creation
+    // If log group doesn't exist, create it, then create the stream before retrying
     if (err.name === "ResourceNotFoundException") {
       try {
         const { logGroupName } = getCloudWatchConfig();
         const client = getCloudWatchClient();
-        await client.send(new CreateLogStreamCommand({ logGroupName, logStreamName }));
+
+        try {
+          await client.send(
+            new CreateLogGroupCommand({
+              logGroupName,
+            })
+          );
+        } catch (groupErr: any) {
+          if (groupErr.name !== "ResourceAlreadyExistsException") {
+            throw groupErr;
+          }
+        }
+
+        try {
+          await client.send(
+            new CreateLogStreamCommand({
+              logGroupName,
+              logStreamName,
+            })
+          );
+        } catch (streamErr: any) {
+          if (streamErr.name !== "ResourceAlreadyExistsException") {
+            throw streamErr;
+          }
+        }
+
         await logToCloudWatch(logStreamName, eventMessage, metadata);
       } catch (createErr) {
         console.error("[Amazon CloudWatch Stream Creation Error]:", createErr);
