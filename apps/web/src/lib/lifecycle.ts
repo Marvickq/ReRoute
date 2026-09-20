@@ -219,7 +219,11 @@ export function autoApproveVerifications(lot: MaterialLot): void {
 
   const now = new Date().toISOString();
 
-  // Auto approve unverified material items
+  // Do NOT auto-approve if any observation was explicitly marked inconclusive
+  const hasInconclusive = lot.verifications.some((v) => v.decision === "cannot_determine");
+  if (hasInconclusive) return;
+
+  // Auto approve unverified material items (only items that have NO existing verification record)
   for (const item of lot.material_items) {
     const existing = lot.verifications.find(
       (v) => v.target_type === "material" && v.target_id === item.item_id
@@ -238,7 +242,7 @@ export function autoApproveVerifications(lot: MaterialLot): void {
     }
   }
 
-  // Auto approve unverified hazard signals
+  // Auto approve unverified hazard signals (only signals that have NO existing verification record)
   for (const signal of lot.hazard_signals) {
     const existing = lot.verifications.find(
       (v) => v.target_type === "hazard" && v.target_id === signal.signal_id
