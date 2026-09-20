@@ -1,6 +1,7 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 import { readFile } from "fs/promises";
 import path from "path";
+import os from "os";
 import type { Evidence, MaterialItem, HazardSignal, AnalysisResult } from "@/types";
 import { classifyUncertainty } from "./uncertainty";
 
@@ -9,7 +10,16 @@ const MODEL_ID =
   process.env.MY_AWS_BEDROCK_MODEL_ID ||
   process.env.AWS_BEDROCK_MODEL_ID ||
   "us.amazon.nova-pro-v1:0";
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+
+async function readFileBuffer(filename: string): Promise<Buffer> {
+  const primaryPath = path.join(process.cwd(), "uploads", filename);
+  try {
+    return await readFile(primaryPath);
+  } catch {
+    const tmpPath = path.join(os.tmpdir(), "uploads", filename);
+    return await readFile(tmpPath);
+  }
+}
 
 const ANALYSIS_PROMPT = `You are an e-waste material analysis system. Analyze the provided evidence (photos, text descriptions, voice transcriptions) and extract structured material intelligence.
 
@@ -148,8 +158,7 @@ async function readEvidenceFiles(evidence: Evidence[]): Promise<BedrockAnalysisI
   for (const ev of evidence) {
     if (ev.type === "photo") {
       try {
-        const filePath = path.join(UPLOAD_DIR, ev.filename);
-        const buffer = await readFile(filePath);
+        const buffer = await readFileBuffer(ev.filename);
         const actualMime = detectActualImageMimeType(buffer, ev.mime_type);
         images.push({
           data: buffer.toString("base64"),
@@ -409,8 +418,7 @@ async function tryYoloAnalysis(
   if (!photo) return null;
 
   try {
-    const filePath = path.join(UPLOAD_DIR, photo.filename);
-    const fileBuffer = await readFile(filePath);
+    const fileBuffer = await readFileBuffer(photo.filename);
     const formData = new FormData();
     const blob = new Blob([fileBuffer], { type: photo.mime_type || "image/jpeg" });
     formData.append("file", blob, photo.original_filename);
