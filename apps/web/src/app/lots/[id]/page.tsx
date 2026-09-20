@@ -429,6 +429,31 @@ export default function LotDetailPage() {
               Safety & Routing
             </h3>
 
+            {lot.status === "blocked" && (
+              <div className="bg-[#450a0a]/50 border border-[#7f1d1d] rounded-md p-4 mb-4">
+                <div className="flex items-center gap-2 text-[#ef4444] font-medium text-[13px] mb-2">
+                  <span>🚫 Safety Evaluation Blocked</span>
+                </div>
+                {lot.safety_result?.blocking_reasons && lot.safety_result.blocking_reasons.length > 0 && (
+                  <ul className="list-disc list-inside text-[12px] text-[#fca5a5] space-y-1 mb-3">
+                    {lot.safety_result.blocking_reasons.map((r, idx) => (
+                      <li key={idx}>{r}</li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[11px] text-[#a0a0a0] mb-3">
+                  An inspector can perform a manual physical inspection and override the safety block to re-evaluate routing.
+                </p>
+                <button
+                  onClick={() => handleTransition("unblock")}
+                  disabled={transitionLoading}
+                  className="px-4 py-2 bg-[#422006] border border-[#78350f] rounded-md text-[12px] font-medium text-[#f59e0b] hover:bg-[#78350f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  🔓 Unblock & Re-Evaluate Lot (Inspector Override)
+                </button>
+              </div>
+            )}
+
             {canRoute && (
               <div className="py-4 text-center">
                 <p className="text-[11px] text-[#444] mb-3">
@@ -439,7 +464,7 @@ export default function LotDetailPage() {
                   disabled={routingLoading}
                   className="px-4 py-1.5 bg-[#1e3a5f] border border-[#2563eb]/30 rounded-md text-[12px] text-[#3b82f6] hover:bg-[#1e4070] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {routingLoading ? "Evaluating..." : "Evaluate Routing"}
+                  {routingLoading ? "Evaluating..." : "Evaluate Safety & Routing"}
                 </button>
               </div>
             )}
@@ -450,7 +475,7 @@ export default function LotDetailPage() {
               </div>
             )}
 
-            {lot.safety_result && (
+            {lot.safety_result && lot.status !== "blocked" && (
               <SafetyResultCard safety={lot.safety_result} />
             )}
 
@@ -461,7 +486,7 @@ export default function LotDetailPage() {
               />
             )}
 
-            {!hasAnalysis && !lot.safety_result && (
+            {!hasAnalysis && !lot.safety_result && lot.status !== "blocked" && (
               <p className="text-[12px] text-[#444] text-center py-4">
                 Complete AI analysis first to enable safety evaluation and routing.
               </p>
