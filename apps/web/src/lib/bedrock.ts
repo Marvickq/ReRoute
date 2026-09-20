@@ -398,6 +398,49 @@ function mapHazardSignals(raw: RawBedrockHazard[], lotId: string, evidenceIds: s
   });
 }
 
+const YOLO_API_URL = process.env.YOLO_API_URL || process.env.MY_YOLO_API_URL;
+
+async function tryYoloAnalysis(
+  evidence: Evidence[],
+  lotId: string
+): Promise<AnalysisResult | null> {
+  if (!YOLO_API_URL) return null;
+  const photo = evidence.find((e) => e.type === "photo");
+  if (!photo) return null;
+
+  try {
+    const filePath = path.join(UPLOAD_DIR, photo.filename);
+    const fileBuffer = await readFile(filePath);
+    const formData = new FormData();
+    const blob = new Blob([fileBuffer], { type: photo.mime_type || "image/jpeg" });
+    formData.append("file", blob, photo.original_filename);
+
+    const res = await fetch(YOLO_API_URL, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.success || !data.bedrock) return null;
+
+    const evidenceIds = evidence.map((e) => e.evidence_id);
+    const items = mapItems(data.bedrock.items || [], lotId, evidenceIds);
+    const hazardSignals = mapHazardSignals(data.bedrock.hazard_signals || [], lotId, evidenceIds);
+
+    return {
+      lot_id: lotId,
+      items,
+      hazard_signals: hazardSignals,
+      analyzed_at: new Date().toISOString(),
+      model_used: "yolov8n + amazon-nova",
+    };
+  } catch (err) {
+    console.warn("[YOLO API Warning] Could not reach YOLO microservice, falling back to direct Bedrock:", err);
+    return null;
+  }
+}
+
 export async function analyzeLot(
   evidence: Evidence[],
   textDescription: string | null,
@@ -408,6 +451,10 @@ export async function analyzeLot(
   }
 
   const evidenceIds = evidence.map((e) => e.evidence_id);
+
+  // Try YOLO microservice if configured
+  const yoloResult = await tryYoloAnalysis(evidence, lotId);
+  if (yoloResult) return yoloResult;
 
   if (!isConfigured()) {
     console.log("Bedrock not configured — using mock analysis");
