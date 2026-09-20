@@ -420,7 +420,7 @@ async function tryYoloAnalysis(
   try {
     const fileBuffer = await readFileBuffer(photo.filename);
     const formData = new FormData();
-    const blob = new Blob([fileBuffer], { type: photo.mime_type || "image/jpeg" });
+    const blob = new Blob([new Uint8Array(fileBuffer)], { type: photo.mime_type || "image/jpeg" });
     formData.append("file", blob, photo.original_filename);
 
     const res = await fetch(YOLO_API_URL, {

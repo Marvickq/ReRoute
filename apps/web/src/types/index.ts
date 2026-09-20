@@ -91,6 +91,7 @@ export interface Evidence {
   mime_type: string;
   size: number;
   url: string;
+  s3_key?: string;
   created_at: string;
 }
 
