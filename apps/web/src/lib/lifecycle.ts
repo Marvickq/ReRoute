@@ -152,7 +152,7 @@ function handleVerify(lot: MaterialLot, metadata: Record<string, unknown>): Tran
 function handleUnblock(lot: MaterialLot, metadata: Record<string, unknown>): TransitionResult {
   const currentStatus = lot.status;
 
-  const UNBLOCKABLE_STATUSES: LotStatus[] = ["blocked", "safety_review", "review_required"];
+  const UNBLOCKABLE_STATUSES: LotStatus[] = ["blocked", "safety_review", "review_required", "analyzed"];
   if (!UNBLOCKABLE_STATUSES.includes(currentStatus)) {
     return {
       success: false,
@@ -163,23 +163,67 @@ function handleUnblock(lot: MaterialLot, metadata: Record<string, unknown>): Tra
     };
   }
 
-  // Clear safety block upon inspector override
-  if (lot.safety_result) {
-    lot.safety_result.blocked = false;
-    lot.safety_result.blocking_reasons = [];
-  }
+  const now = new Date().toISOString();
+  const inspector = (metadata.actor as string) || "demo_operator";
 
-  // When inspector executes unblock override, mark blocking hazard verifications as rejected (cleared)
-  for (const v of lot.verifications) {
-    if (v.target_type === "hazard") {
-      v.decision = "rejected";
-      v.note = (v.note ? `${v.note} ` : "") + "(Cleared via physical inspector override)";
+  // 1. Mark ALL hazard signals as rejected/cleared via inspector override
+  for (const signal of lot.hazard_signals) {
+    signal.verification_status = "rejected";
+    const existing = lot.verifications.find(
+      (v) => v.target_type === "hazard" && v.target_id === signal.signal_id
+    );
+    if (existing) {
+      existing.decision = "rejected";
+      existing.note = "Cleared via physical inspector override";
+      existing.verified_at = now;
+      existing.verified_by = inspector;
+    } else {
+      lot.verifications.push({
+        verification_id: `VER-OVERRIDE-${Date.now()}-${signal.signal_id}`,
+        lot_id: lot.lot_id,
+        target_type: "hazard",
+        target_id: signal.signal_id,
+        decision: "rejected",
+        note: "Cleared via physical inspector override",
+        verified_at: now,
+        verified_by: inspector,
+      });
     }
   }
 
-  for (const signal of lot.hazard_signals) {
-    signal.verification_status = "rejected";
+  // 2. Mark ALL material items as confirmed/cleared via inspector override
+  for (const item of lot.material_items) {
+    const existing = lot.verifications.find(
+      (v) => v.target_type === "material" && v.target_id === item.item_id
+    );
+    if (existing) {
+      existing.decision = "confirmed";
+      existing.note = "Verified & cleared via physical inspector override";
+      existing.verified_at = now;
+      existing.verified_by = inspector;
+    } else {
+      lot.verifications.push({
+        verification_id: `VER-OVERRIDE-${Date.now()}-${item.item_id}`,
+        lot_id: lot.lot_id,
+        target_type: "material",
+        target_id: item.item_id,
+        decision: "confirmed",
+        note: "Verified & cleared via physical inspector override",
+        verified_at: now,
+        verified_by: inspector,
+      });
+    }
   }
+
+  // 3. Clear safety block upon inspector override
+  lot.safety_result = {
+    lot_id: lot.lot_id,
+    requires_human_review: false,
+    blocked: false,
+    blocking_reasons: [],
+    special_handling: lot.safety_result?.special_handling || [],
+    evaluated_at: now,
+  };
 
   const targetStatus: LotStatus = "verified";
 
