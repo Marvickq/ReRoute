@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       original_filename: file.name,
       mime_type: file.type,
       size: file.size,
-      url: s3Url || `/uploads/${filename}`,
+      url: `/api/uploads/${filename}`,
       s3_key: s3Key,
       created_at: new Date().toISOString(),
     };
