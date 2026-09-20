@@ -49,7 +49,13 @@ export default function LotDetailPage() {
 
     try {
       const res = await fetch(`/api/lots/${lot.lot_id}/analyze`, { method: "POST" });
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`Server response error (${res.status}). Please try again.`);
+      }
       if (!res.ok) {
         throw new Error(data.error || "Analysis failed");
       }

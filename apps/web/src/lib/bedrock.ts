@@ -436,7 +436,7 @@ async function tryYoloAnalysis(
     const res = await fetch(yoloUrl, {
       method: "POST",
       body: formData,
-      signal: AbortSignal.timeout(60000), // 60s timeout for Render cold starts
+      signal: AbortSignal.timeout(8000), // 8s timeout to prevent AWS Amplify Lambda gateway timeouts
     });
 
     if (!res.ok) {
