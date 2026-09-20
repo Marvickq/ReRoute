@@ -8,7 +8,7 @@ applications:
             - npm ci
         build:
           commands:
-            - env | grep -E 'AWS_|NODE_ENV|PORT' >> .env.production
+            - env | grep -E 'MY_AWS_|AWS_|NODE_ENV|PORT|YOLO' >> .env.production
             - npm run build
       artifacts:
         baseDirectory: .next
