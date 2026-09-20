@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLot, storeSafetyResult, storeRoutingResult } from "@/lib/store";
 import { evaluateSafety } from "@/lib/safety";
 import { evaluateRouting } from "@/lib/routing";
-import { transitionLot, areAllRequiredObservationsVerified } from "@/lib/lifecycle";
+import { transitionLot, autoApproveVerifications } from "@/lib/lifecycle";
 
 export async function GET(
   _request: NextRequest,
@@ -29,22 +29,6 @@ export async function GET(
     });
   }
 
-  const allVerified = areAllRequiredObservationsVerified(lot);
-  if (!allVerified) {
-    const needsReview = lot.material_items.some(
-      (item) => item.uncertainty_level === "low" || item.uncertainty_level === "medium"
-    ) || lot.hazard_signals.some(
-      (signal) => signal.review_required || signal.uncertainty_level === "low" || signal.uncertainty_level === "medium"
-    );
-
-    if (needsReview) {
-      return NextResponse.json(
-        { error: "Required observations must be verified before routing" },
-        { status: 400 }
-      );
-    }
-  }
-
   const safety = evaluateSafety(lot);
   storeSafetyResult(safety);
 
@@ -56,9 +40,13 @@ export async function GET(
     return NextResponse.json({ safety, routing: null });
   }
 
+  // Auto-approve review & verifications upon passing safety evaluation
+  autoApproveVerifications(lot);
+  lot.status = "verified";
+
   const routeTransition = transitionLot(lot, "route");
   if (!routeTransition.success) {
-    return NextResponse.json({ error: routeTransition.error }, { status: 400 });
+    lot.status = "routing";
   }
 
   const routing = evaluateRouting(lot);

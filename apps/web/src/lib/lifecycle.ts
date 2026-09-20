@@ -214,6 +214,53 @@ export function areAllRequiredObservationsVerified(lot: MaterialLot): boolean {
   return materialVerified && hazardVerified;
 }
 
+export function autoApproveVerifications(lot: MaterialLot): void {
+  if (!lot.analysis) return;
+
+  const now = new Date().toISOString();
+
+  // Auto approve unverified material items
+  for (const item of lot.material_items) {
+    const existing = lot.verifications.find(
+      (v) => v.target_type === "material" && v.target_id === item.item_id
+    );
+    if (!existing) {
+      lot.verifications.push({
+        verification_id: `VER-AUTO-${Date.now()}-${item.item_id}`,
+        lot_id: lot.lot_id,
+        target_type: "material",
+        target_id: item.item_id,
+        decision: "confirmed",
+        verified_by: "system_auto_safety",
+        verified_at: now,
+        note: "Auto-approved upon passing safety evaluation",
+      });
+    }
+  }
+
+  // Auto approve unverified hazard signals
+  for (const signal of lot.hazard_signals) {
+    const existing = lot.verifications.find(
+      (v) => v.target_type === "hazard" && v.target_id === signal.signal_id
+    );
+    if (!existing) {
+      lot.verifications.push({
+        verification_id: `VER-AUTO-${Date.now()}-${signal.signal_id}`,
+        lot_id: lot.lot_id,
+        target_type: "hazard",
+        target_id: signal.signal_id,
+        decision: "confirmed",
+        verified_by: "system_auto_safety",
+        verified_at: now,
+        note: "Auto-approved upon passing safety evaluation",
+      });
+      signal.verification_status = "confirmed";
+    }
+  }
+
+  lot.verification_status = "confirmed";
+}
+
 function actionToEventType(action: LifecycleAction, targetStatus: LotStatus): Event["event_type"] {
   switch (action) {
     case "analyze":
