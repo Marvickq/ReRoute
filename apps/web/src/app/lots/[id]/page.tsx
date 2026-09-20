@@ -135,7 +135,7 @@ export default function LotDetailPage() {
     }
   };
 
-  const handleTransition = async (action: "dispatch" | "receive") => {
+  const handleTransition = async (action: "dispatch" | "receive" | "unblock") => {
     if (!lot) return;
     setTransitionLoading(true);
     setTransitionError(null);
@@ -151,6 +151,9 @@ export default function LotDetailPage() {
         throw new Error(data.error || "Transition failed");
       }
       setLot(data.lot);
+      if (action === "unblock") {
+        await handleGetRouting();
+      }
     } catch (err) {
       setTransitionError(err instanceof Error ? err.message : "Transition failed");
     } finally {
@@ -189,6 +192,7 @@ export default function LotDetailPage() {
   const canRoute = hasAnalysis && !hasRouting && lot.status !== "blocked" && areAllRequiredObservationsVerified(lot);
   const canDispatch = lot.status === "routed";
   const canReceive = lot.status === "dispatched";
+  const canUnblock = lot.status === "blocked";
 
   const lifecycleSteps = getLifecycleSteps(lot);
 
@@ -547,7 +551,7 @@ export default function LotDetailPage() {
           </div>
 
           {/* Actions */}
-          {(canDispatch || canReceive) && (
+          {(canDispatch || canReceive || canUnblock) && (
             <div className="bg-[#111] border border-[#2a2a2a] rounded-lg p-5">
               <h3 className="text-[13px] font-medium text-[#f0f0f0] mb-3">Actions</h3>
               {transitionError && (
@@ -572,6 +576,15 @@ export default function LotDetailPage() {
                     className="w-full px-4 py-2 bg-[#052e16] border border-[#14532d]/30 rounded-md text-[12px] text-[#22c55e] hover:bg-[#0a3d1f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {transitionLoading ? "Processing..." : "Mark as Received"}
+                  </button>
+                )}
+                {canUnblock && (
+                  <button
+                    onClick={() => handleTransition("unblock")}
+                    disabled={transitionLoading}
+                    className="w-full px-4 py-2 bg-[#422006] border border-[#78350f] rounded-md text-[12px] text-[#f59e0b] hover:bg-[#78350f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    🔓 Unblock & Re-Evaluate Lot
                   </button>
                 )}
               </div>

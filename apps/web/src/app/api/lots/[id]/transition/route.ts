@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLot } from "@/lib/store";
 import { transitionLot, type LifecycleAction } from "@/lib/lifecycle";
 
-const VALID_ACTIONS: LifecycleAction[] = ["dispatch", "receive"];
+const VALID_ACTIONS: LifecycleAction[] = ["dispatch", "receive", "unblock"];
 
 export async function POST(
   request: NextRequest,
