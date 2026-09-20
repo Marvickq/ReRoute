@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLot, storeSafetyResult, storeRoutingResult } from "@/lib/store";
+import { getLot, storeSafetyResult, storeRoutingResult, syncLotToCloud } from "@/lib/store";
 import { evaluateSafety } from "@/lib/safety";
 import { evaluateRouting } from "@/lib/routing";
 import { transitionLot, autoApproveVerifications } from "@/lib/lifecycle";
@@ -22,26 +22,21 @@ export async function GET(
     );
   }
 
-  // Always re-evaluate safety to respect inspector unblock overrides and rejected hazard verifications
+  // Run safety evaluation rule engine
   const safety = evaluateSafety(lot);
-
-  // If inspector unblocked the lot, honor unblock override
-  if (lot.status === "verified" || lot.status === "routing" || lot.status === "routed") {
-    safety.blocked = false;
-    safety.blocking_reasons = [];
-  }
-
   storeSafetyResult(safety);
 
-  if (safety.blocked) {
+  // If safety evaluation flags hazardous conditions, mark lot as blocked and display unblock action
+  if (safety.blocked && lot.status !== "routed" && lot.status !== "dispatched" && lot.status !== "received") {
     transitionLot(lot, "block", {
       reasons: safety.blocking_reasons,
       actor: "system",
     });
-    return NextResponse.json({ safety, routing: null });
+    syncLotToCloud(lot);
+    return NextResponse.json({ safety, routing: null, lot });
   }
 
-  // Auto-approve review & verifications upon passing safety evaluation
+  // Safety passed or inspector unblock override cleared safety block!
   autoApproveVerifications(lot);
   if (lot.status !== "routed" && lot.status !== "dispatched" && lot.status !== "received") {
     lot.status = "verified";
@@ -58,6 +53,8 @@ export async function GET(
   if (routing.recommended_facility_id && !routing.routing_blocked) {
     lot.status = "routed";
   }
+
+  syncLotToCloud(lot);
 
   return NextResponse.json({
     safety,

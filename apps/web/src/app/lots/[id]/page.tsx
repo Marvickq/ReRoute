@@ -435,7 +435,7 @@ export default function LotDetailPage() {
               Safety & Routing
             </h3>
 
-            {lot.status === "blocked" && (
+            {(lot.status === "blocked" || lot.safety_result?.blocked) && (
               <div className="bg-[#450a0a]/50 border border-[#7f1d1d] rounded-md p-4 mb-4">
                 <div className="flex items-center gap-2 text-[#ef4444] font-medium text-[13px] mb-2">
                   <span>🚫 Safety Evaluation Blocked</span>
