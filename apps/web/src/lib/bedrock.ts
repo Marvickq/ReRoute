@@ -407,13 +407,22 @@ function mapHazardSignals(raw: RawBedrockHazard[], lotId: string, evidenceIds: s
   });
 }
 
-const YOLO_API_URL = process.env.YOLO_API_URL || process.env.MY_YOLO_API_URL || "http://127.0.0.1:8005/material-analysis";
+function getYoloUrl(): string {
+  let rawUrl = process.env.MY_YOLO_API_URL || process.env.YOLO_API_URL || "";
+  if (!rawUrl) return "http://127.0.0.1:8005/material-analysis";
+  rawUrl = rawUrl.trim().replace(/\/+$/, "");
+  if (!rawUrl.endsWith("/material-analysis")) {
+    rawUrl = `${rawUrl}/material-analysis`;
+  }
+  return rawUrl;
+}
 
 async function tryYoloAnalysis(
   evidence: Evidence[],
   lotId: string
 ): Promise<AnalysisResult | null> {
-  if (!YOLO_API_URL) return null;
+  const yoloUrl = getYoloUrl();
+  if (!yoloUrl) return null;
   const photo = evidence.find((e) => e.type === "photo");
   if (!photo) return null;
 
@@ -423,14 +432,22 @@ async function tryYoloAnalysis(
     const blob = new Blob([new Uint8Array(fileBuffer)], { type: photo.mime_type || "image/jpeg" });
     formData.append("file", blob, photo.original_filename);
 
-    const res = await fetch(YOLO_API_URL, {
+    console.log(`[YOLO API] Sending material analysis request to: ${yoloUrl}`);
+    const res = await fetch(yoloUrl, {
       method: "POST",
       body: formData,
+      signal: AbortSignal.timeout(60000), // 60s timeout for Render cold starts
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[YOLO API Error] HTTP ${res.status}: ${res.statusText}`);
+      return null;
+    }
     const data = await res.json();
-    if (!data.success || !data.bedrock) return null;
+    if (!data.success || !data.bedrock) {
+      console.warn("[YOLO API Error] Invalid response format from YOLO server:", data);
+      return null;
+    }
 
     const evidenceIds = evidence.map((e) => e.evidence_id);
     const items = mapItems(data.bedrock.items || [], lotId, evidenceIds);
