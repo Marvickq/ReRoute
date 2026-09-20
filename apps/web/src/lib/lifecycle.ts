@@ -161,17 +161,27 @@ function handleUnblock(lot: MaterialLot, metadata: Record<string, unknown>): Tra
     };
   }
 
-  const allVerified = areAllRequiredObservationsVerified(lot);
-  const hasAnalysis = lot.analysis !== null;
-
-  let targetStatus: LotStatus;
-  if (allVerified && hasAnalysis) {
-    targetStatus = "verified";
-  } else if (hasAnalysis) {
-    targetStatus = "review_required";
-  } else {
-    targetStatus = "created";
+  // Clear safety block upon inspector override
+  if (lot.safety_result) {
+    lot.safety_result.blocked = false;
+    lot.safety_result.blocking_reasons = [];
   }
+
+  // Resolve any inconclusive verifications to confirmed with inspector override note
+  for (const v of lot.verifications) {
+    if (v.decision === "cannot_determine") {
+      v.decision = "confirmed";
+      v.note = (v.note ? `${v.note} ` : "") + "(Cleared via physical inspector override)";
+    }
+  }
+
+  for (const signal of lot.hazard_signals) {
+    if (signal.verification_status === "cannot_determine") {
+      signal.verification_status = "confirmed";
+    }
+  }
+
+  const targetStatus: LotStatus = "verified";
 
   const event = createEvent(lot, "lot_unblocked", {
     ...metadata,
