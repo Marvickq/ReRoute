@@ -22,14 +22,15 @@ export async function GET(
     );
   }
 
-  if (lot.safety_result && lot.routing_result) {
-    return NextResponse.json({
-      safety: lot.safety_result,
-      routing: lot.routing_result,
-    });
+  // Always re-evaluate safety to respect inspector unblock overrides and rejected hazard verifications
+  const safety = evaluateSafety(lot);
+
+  // If inspector unblocked the lot, honor unblock override
+  if (lot.status === "verified" || lot.status === "routing" || lot.status === "routed") {
+    safety.blocked = false;
+    safety.blocking_reasons = [];
   }
 
-  const safety = evaluateSafety(lot);
   storeSafetyResult(safety);
 
   if (safety.blocked) {
@@ -42,10 +43,12 @@ export async function GET(
 
   // Auto-approve review & verifications upon passing safety evaluation
   autoApproveVerifications(lot);
-  lot.status = "verified";
+  if (lot.status !== "routed" && lot.status !== "dispatched" && lot.status !== "received") {
+    lot.status = "verified";
+  }
 
   const routeTransition = transitionLot(lot, "route");
-  if (!routeTransition.success) {
+  if (!routeTransition.success && lot.status !== "routed") {
     lot.status = "routing";
   }
 
@@ -59,5 +62,6 @@ export async function GET(
   return NextResponse.json({
     safety,
     routing,
+    lot,
   });
 }

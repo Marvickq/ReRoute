@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLot } from "@/lib/store";
+import { getLot, syncLotToCloud } from "@/lib/store";
 import { transitionLot, type LifecycleAction } from "@/lib/lifecycle";
 
 const VALID_ACTIONS: LifecycleAction[] = ["dispatch", "receive", "unblock"];
@@ -53,6 +53,8 @@ export async function POST(
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
+
+  syncLotToCloud(lot);
 
   return NextResponse.json({
     lot,

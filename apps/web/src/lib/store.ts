@@ -41,7 +41,7 @@ const analysisStore = globalStore.__reloop_analysis ?? (globalStore.__reloop_ana
 const materialItemStore = globalStore.__reloop_materialItems ?? (globalStore.__reloop_materialItems = new Map<string, MaterialItem>());
 const hazardSignalStore = globalStore.__reloop_hazardSignals ?? (globalStore.__reloop_hazardSignals = new Map<string, HazardSignal>());
 
-function syncLotToCloud(lot: MaterialLot): void {
+export function syncLotToCloud(lot: MaterialLot): void {
   if (isDynamoDBConfigured()) {
     saveLotToDynamoDB(lot).catch((err) =>
       console.error(`[DynamoDB Sync Error] Failed to sync lot ${lot.lot_id}:`, err)
