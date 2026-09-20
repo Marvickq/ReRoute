@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createLot, getAllLots } from "@/lib/store";
+import { createLot, getAllLotsAsync } from "@/lib/store";
 import { CreateLotRequest } from "@/types";
 
 export async function GET() {
-  const lots = getAllLots();
+  const lots = await getAllLotsAsync();
   return NextResponse.json({ lots });
 }
 

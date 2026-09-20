@@ -13,7 +13,7 @@ import {
   ReviewQueueItem,
 } from "@/types";
 
-import { saveLotToDynamoDB, isDynamoDBConfigured } from "./dynamodb";
+import { saveLotToDynamoDB, getLotFromDynamoDB, getAllLotsFromDynamoDB, isDynamoDBConfigured } from "./dynamodb";
 import { publishReRouteEvent } from "./events";
 import { startLotWorkflowInStepFunctions } from "./stepfunctions";
 import { logToCloudWatch } from "./cloudwatch";
@@ -110,10 +110,46 @@ export function getLot(lotId: string): MaterialLot | undefined {
   return lots.get(lotId);
 }
 
+export async function getLotAsync(lotId: string): Promise<MaterialLot | undefined> {
+  const inMemory = lots.get(lotId);
+  if (inMemory) return inMemory;
+
+  if (isDynamoDBConfigured()) {
+    try {
+      const fromDb = await getLotFromDynamoDB(lotId);
+      if (fromDb) {
+        lots.set(lotId, fromDb);
+        return fromDb;
+      }
+    } catch (err) {
+      console.warn(`[DynamoDB Lookup Warning] Could not fetch lot ${lotId}:`, err);
+    }
+  }
+
+  return undefined;
+}
+
 export function getAllLots(): MaterialLot[] {
   return Array.from(lots.values()).sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
+}
+
+export async function getAllLotsAsync(): Promise<MaterialLot[]> {
+  if (isDynamoDBConfigured()) {
+    try {
+      const dbLots = await getAllLotsFromDynamoDB();
+      if (dbLots.length > 0) {
+        for (const lot of dbLots) {
+          lots.set(lot.lot_id, lot);
+        }
+        return dbLots;
+      }
+    } catch (err) {
+      console.warn("[DynamoDB Scan Warning] Failed to scan lots:", err);
+    }
+  }
+  return getAllLots();
 }
 
 export function storeEvidence(evidence: Evidence): void {

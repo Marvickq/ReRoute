@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLot, syncLotToCloud } from "@/lib/store";
+import { getLotAsync, syncLotToCloud } from "@/lib/store";
 import { transitionLot, type LifecycleAction } from "@/lib/lifecycle";
 
 const VALID_ACTIONS: LifecycleAction[] = ["dispatch", "receive", "unblock"];
@@ -28,7 +28,7 @@ export async function POST(
     );
   }
 
-  const lot = getLot(id);
+  const lot = await getLotAsync(id);
   if (!lot) {
     return NextResponse.json({ error: "Lot not found" }, { status: 404 });
   }

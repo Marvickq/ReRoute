@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  getLot,
+  getLotAsync,
   getVerificationsForLot,
   getVerificationForTarget,
   storeVerification,
@@ -52,7 +52,7 @@ export async function POST(
       );
     }
 
-    const lot = getLot(id);
+    const lot = await getLotAsync(id);
     if (!lot) {
       return NextResponse.json({ error: "Lot not found" }, { status: 404 });
     }
