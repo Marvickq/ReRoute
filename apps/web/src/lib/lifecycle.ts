@@ -22,7 +22,7 @@ const VALID_TRANSITIONS: Record<LotStatus, LotStatus[]> = {
   routed: ["dispatched", "blocked"],
   dispatched: ["received"],
   received: [],
-  blocked: ["review_required", "routing", "routed"],
+  blocked: ["review_required", "verified", "routing", "routed"],
 };
 
 const ACTION_TO_STATUS: Record<LifecycleAction, LotStatus | null> = {
@@ -107,7 +107,8 @@ function handleVerify(lot: MaterialLot, metadata: Record<string, unknown>): Tran
   const currentStatus = lot.status;
   const decision = metadata.decision as string;
 
-  if (currentStatus !== "review_required" && currentStatus !== "analyzed") {
+  const VERIFIABLE_STATUSES: LotStatus[] = ["review_required", "analyzed", "safety_review", "blocked"];
+  if (!VERIFIABLE_STATUSES.includes(currentStatus)) {
     return {
       success: false,
       from: currentStatus,
@@ -151,7 +152,8 @@ function handleVerify(lot: MaterialLot, metadata: Record<string, unknown>): Tran
 function handleUnblock(lot: MaterialLot, metadata: Record<string, unknown>): TransitionResult {
   const currentStatus = lot.status;
 
-  if (currentStatus !== "blocked") {
+  const UNBLOCKABLE_STATUSES: LotStatus[] = ["blocked", "safety_review", "review_required"];
+  if (!UNBLOCKABLE_STATUSES.includes(currentStatus)) {
     return {
       success: false,
       from: currentStatus,

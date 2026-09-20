@@ -6,6 +6,7 @@ import {
   storeVerification,
 } from "@/lib/store";
 import { transitionLot, areAllRequiredObservationsVerified } from "@/lib/lifecycle";
+import { evaluateSafety } from "@/lib/safety";
 import type { Verification, VerificationDecision } from "@/types";
 
 const VALID_DECISIONS: VerificationDecision[] = ["confirmed", "rejected", "cannot_determine"];
@@ -95,23 +96,35 @@ export async function POST(
       );
     }
 
-    const allVerified = areAllRequiredObservationsVerified(lot);
-    if (allVerified && (lot.status === "review_required" || lot.status === "analyzed")) {
-      try {
-        transitionLot(lot, "verify", {
-          decision: body.decision,
-          actor: "demo_operator",
-          target_type: body.target_type,
-          target_id: body.target_id,
-        });
-      } catch (err) {
-        console.error("[Verification] Transition error:", err);
+    // Re-evaluate safety rules after storing verification
+    const safetyResult = evaluateSafety(lot);
+    lot.safety_result = safetyResult;
+
+    if (!safetyResult.blocked) {
+      const allVerified = areAllRequiredObservationsVerified(lot);
+      if (allVerified || body.decision === "rejected") {
+        if (lot.status === "blocked" || lot.status === "safety_review" || lot.status === "review_required" || lot.status === "analyzed") {
+          lot.status = "verified";
+        }
       }
+    } else {
+      lot.status = "blocked";
+    }
+
+    try {
+      transitionLot(lot, "verify", {
+        decision: body.decision,
+        actor: "demo_operator",
+        target_type: body.target_type,
+        target_id: body.target_id,
+      });
+    } catch (err) {
+      console.error("[Verification] Transition error:", err);
     }
 
     const verifications = getVerificationsForLot(id);
 
-    return NextResponse.json({ verification, verifications }, { status: 201 });
+    return NextResponse.json({ verification, verifications, lot }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
