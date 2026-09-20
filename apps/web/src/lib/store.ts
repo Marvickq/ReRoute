@@ -16,6 +16,7 @@ import {
 import { saveLotToDynamoDB, isDynamoDBConfigured } from "./dynamodb";
 import { publishReRouteEvent } from "./events";
 import { startLotWorkflowInStepFunctions } from "./stepfunctions";
+import { logToCloudWatch } from "./cloudwatch";
 
 // Use globalThis to persist stores across Next.js dev mode recompilations
 const globalStore = globalThis as typeof globalThis & {
@@ -98,6 +99,10 @@ export function createLot(text: string | null, evidenceIds: string[]): MaterialL
     passport_id: passportId,
     evidence_count: evidence.length,
   });
+  logToCloudWatch("lot-events", `Lot Created: ${lotId}`, {
+    lot_id: lotId,
+    evidence_count: evidence.length,
+  });
   return lot;
 }
 
@@ -150,6 +155,12 @@ export function storeAnalysis(result: AnalysisResult): void {
     items_count: result.items.length,
     hazard_signals_count: result.hazard_signals.length,
   });
+  logToCloudWatch("ai-analysis", `Bedrock AI Analysis Completed for ${result.lot_id}`, {
+    lot_id: result.lot_id,
+    model_used: result.model_used,
+    items_count: result.items.length,
+    hazard_signals_count: result.hazard_signals.length,
+  });
 }
 
 export function getAnalysis(lotId: string): AnalysisResult | undefined {
@@ -175,6 +186,12 @@ export function storeSafetyResult(result: SafetyResult): void {
   syncLotToCloud(lot);
   if (result.blocked || result.requires_human_review) {
     publishReRouteEvent("SafetyHazardFlagged", result.lot_id, {
+      blocked: result.blocked,
+      requires_human_review: result.requires_human_review,
+      blocking_reasons: result.blocking_reasons,
+    });
+    logToCloudWatch("safety-alerts", `Safety Hazard Flagged for ${result.lot_id}`, {
+      lot_id: result.lot_id,
       blocked: result.blocked,
       requires_human_review: result.requires_human_review,
       blocking_reasons: result.blocking_reasons,
