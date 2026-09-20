@@ -111,7 +111,7 @@ export default function LotsPage() {
                       {lot.text_description || "—"}
                     </td>
                     <td className="px-4 py-3 text-[12px] text-[#666] font-mono text-right">
-                      {new Date(lot.created_at).toLocaleString()}
+                      {lot.created_at.slice(0, 10)}
                     </td>
                   </tr>
                 ))}

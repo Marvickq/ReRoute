@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.next/
+
+# Environment variables (NEVER commit .env)
+.env
+.env.local
+.env.*.local
+
+# Uploads (local file storage)
+uploads/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build
+dist/
+out/
+
+# Testing
+coverage/
+
+# Ignore everything except project files and docs
+*.md
+!README.md
+!docs/
+!docs/**
+
+# ReLoop / YOLO
+reloop-yolo/.venv/
+reloop-yolo/__pycache__/
+reloop-yolo/**/__pycache__/
+reloop-yolo/*.pyc
+reloop-yolo/**/*.pyc
+
+# YOLO datasets and generated outputs
+reloop-yolo/dataset/
+reloop-yolo/runs/
+reloop-yolo/error_analysis/
+runs/
+
+# YOLO model weights
+reloop-yolo/*.pt
+reloop-yolo/*.pth
+reloop-yolo/**/*.pt
+reloop-yolo/**/*.pth
+
+# Python caches
+reloop-yolo/.pytest_cache/
+reloop-yolo/.mypy_cache/
+reloop-yolo/.ruff_cache/

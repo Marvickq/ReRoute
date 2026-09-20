@@ -5,7 +5,7 @@ import type { MaterialPassport } from "@/types";
  */
 export function generatePassportHTML(passport: MaterialPassport): string {
   const generatedAt = new Date(passport.generated_at).toLocaleString();
-  
+
   const itemsRows = passport.material_summary.items
     .map(
       (item) => `
@@ -16,7 +16,7 @@ export function generatePassportHTML(passport: MaterialPassport): string {
         <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${item.battery_present ? "⚡ Yes (Li-ion)" : "No"}</td>
         <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${item.components.join(", ") || "N/A"}</td>
       </tr>
-    `
+    `,
     )
     .join("");
 
@@ -29,7 +29,7 @@ export function generatePassportHTML(passport: MaterialPassport): string {
         <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${(sig.confidence * 100).toFixed(0)}%</td>
         <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${sig.verification_status.toUpperCase()}</td>
       </tr>
-    `
+    `,
     )
     .join("");
 
@@ -102,7 +102,7 @@ export function generatePassportHTML(passport: MaterialPassport): string {
     <div class="header">
       <div>
         <h1 class="title">♻️ ReRoute Digital Material Passport</h1>
-        <div class="subtitle">Official EU WEEE & E-Waste Circular Compliance Document</div>
+        <div class="subtitle">Digital Material Passport for E-Waste Traceability</div>
       </div>
       <div class="badge">${passport.current_status.toUpperCase()}</div>
     </div>

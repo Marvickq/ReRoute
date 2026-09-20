@@ -9,14 +9,8 @@ export default function FacilitiesPage() {
     <AppShell title="Facilities">
       <PageHeader
         title="Facilities"
-        description="Synthetic facility dataset for routing evaluation."
+        description="Authorized e-waste recyclers registered with CPCB/MPCB."
       />
-
-      <div className="mb-3 px-3 py-2 bg-[#422006]/30 border border-[#78350f]/50 rounded-md">
-        <span className="text-[11px] text-[#f59e0b]">
-          Synthetic data — Not real facility information.
-        </span>
-      </div>
 
       <div className="space-y-3">
         {FACILITIES.map((facility) => (

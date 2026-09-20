@@ -164,7 +164,7 @@ function ReviewItem({ item, reviewed }: { item: ReviewQueueItem; reviewed?: bool
       </div>
       {item.verified_at && (
         <div className="mt-2 text-[10px] text-[#444]">
-          Verified: {new Date(item.verified_at).toLocaleString()}
+          Verified: {item.verified_at.slice(0, 10)}
         </div>
       )}
     </Link>
