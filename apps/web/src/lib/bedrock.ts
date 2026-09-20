@@ -398,7 +398,7 @@ function mapHazardSignals(raw: RawBedrockHazard[], lotId: string, evidenceIds: s
   });
 }
 
-const YOLO_API_URL = process.env.YOLO_API_URL || process.env.MY_YOLO_API_URL;
+const YOLO_API_URL = process.env.YOLO_API_URL || process.env.MY_YOLO_API_URL || "http://127.0.0.1:8005/material-analysis";
 
 async function tryYoloAnalysis(
   evidence: Evidence[],

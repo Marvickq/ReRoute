@@ -1,9 +1,12 @@
+import os
 from ultralytics import YOLO
-
 
 MODEL_PATH = "runs/detect/train-11/weights/best.pt"
 
-model = YOLO(MODEL_PATH)
+if os.path.exists(MODEL_PATH):
+    model = YOLO(MODEL_PATH)
+else:
+    model = YOLO("yolov8n.pt")
 
 
 def detect(image_path: str):

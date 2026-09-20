@@ -20,15 +20,29 @@ load_dotenv(ENV_FILE)
 # AWS configuration
 # --------------------------------------------------
 
-REGION = os.getenv("AWS_REGION", "us-east-1")
-
-MODEL_ID = os.getenv(
-    "AWS_BEDROCK_MODEL_ID",
-    "us.amazon.nova-pro-v1:0"
+REGION = (
+    os.getenv("MY_AWS_REGION")
+    or os.getenv("REROUTE_AWS_REGION")
+    or os.getenv("AWS_REGION", "us-east-1")
 )
 
-ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
-SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+MODEL_ID = (
+    os.getenv("MY_AWS_BEDROCK_MODEL_ID")
+    or os.getenv("REROUTE_AWS_BEDROCK_MODEL_ID")
+    or os.getenv("AWS_BEDROCK_MODEL_ID", "us.amazon.nova-pro-v1:0")
+)
+
+ACCESS_KEY = (
+    os.getenv("MY_AWS_ACCESS_KEY_ID")
+    or os.getenv("REROUTE_AWS_ACCESS_KEY_ID")
+    or os.getenv("AWS_ACCESS_KEY_ID")
+)
+
+SECRET_KEY = (
+    os.getenv("MY_AWS_SECRET_ACCESS_KEY")
+    or os.getenv("REROUTE_AWS_SECRET_ACCESS_KEY")
+    or os.getenv("AWS_SECRET_ACCESS_KEY")
+)
 
 
 print("AWS region:", REGION)
