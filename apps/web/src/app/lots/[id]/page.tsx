@@ -81,6 +81,60 @@ export default function LotDetailPage() {
     }
   };
 
+  const handleVerifyObservation = async (
+    target_type: "material" | "hazard",
+    target_id: string,
+    decision: "confirmed" | "rejected" | "cannot_determine"
+  ) => {
+    if (!lot) return;
+    try {
+      const res = await fetch(`/api/lots/${lot.lot_id}/verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_type, target_id, decision }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Verification failed");
+      }
+      await fetchLot();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Verification failed");
+    }
+  };
+
+  const handleVerifyAllObservations = async () => {
+    if (!lot || !lot.analysis) return;
+    try {
+      const unverifiedItems = lot.material_items.filter(
+        (item) => !lot.verifications.some((v) => v.target_type === "material" && v.target_id === item.item_id)
+      );
+      const unverifiedHazards = lot.hazard_signals.filter(
+        (signal) => !lot.verifications.some((v) => v.target_type === "hazard" && v.target_id === signal.signal_id)
+      );
+
+      for (const item of unverifiedItems) {
+        await fetch(`/api/lots/${lot.lot_id}/verification`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target_type: "material", target_id: item.item_id, decision: "confirmed" }),
+        });
+      }
+
+      for (const signal of unverifiedHazards) {
+        await fetch(`/api/lots/${lot.lot_id}/verification`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target_type: "hazard", target_id: signal.signal_id, decision: "confirmed" }),
+        });
+      }
+
+      await fetchLot();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Bulk verification failed");
+    }
+  };
+
   const handleTransition = async (action: "dispatch" | "receive") => {
     if (!lot) return;
     setTransitionLoading(true);
@@ -243,14 +297,27 @@ export default function LotDetailPage() {
           <div className="bg-[#111] border border-[#2a2a2a] rounded-lg p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[13px] font-medium text-[#f0f0f0]">AI Material Understanding</h3>
-              {canAnalyze && !analyzing && (
-                <button
-                  onClick={handleAnalyze}
-                  className="px-4 py-1.5 bg-[#3b82f6] text-white rounded-md text-[12px] font-medium hover:bg-[#2563eb] transition-colors"
-                >
-                  Analyze with AI
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {hasAnalysis && (
+                  lot.analysis!.items.some((i) => !lot.verifications.some((v) => v.target_type === "material" && v.target_id === i.item_id)) ||
+                  lot.analysis!.hazard_signals.some((s) => !lot.verifications.some((v) => v.target_type === "hazard" && v.target_id === s.signal_id))
+                ) && (
+                  <button
+                    onClick={handleVerifyAllObservations}
+                    className="px-3 py-1.5 bg-[#14532d]/60 border border-[#22c55e]/50 rounded-md text-[12px] font-medium text-[#22c55e] hover:bg-[#14532d] transition-colors flex items-center gap-1.5"
+                  >
+                    ✓ Verify All Observations
+                  </button>
+                )}
+                {canAnalyze && !analyzing && (
+                  <button
+                    onClick={handleAnalyze}
+                    className="px-4 py-1.5 bg-[#3b82f6] text-white rounded-md text-[12px] font-medium hover:bg-[#2563eb] transition-colors"
+                  >
+                    Analyze with AI
+                  </button>
+                )}
+              </div>
             </div>
 
             {lot.status === "analyzing" && (
@@ -305,6 +372,7 @@ export default function LotDetailPage() {
                             evidence={lot.evidence}
                             lotId={lot.lot_id}
                             verification={v ? { decision: v.decision, verified_at: v.verified_at } : null}
+                            onVerify={(decision) => handleVerifyObservation("material", item.item_id, decision)}
                           />
                         );
                       })}
@@ -326,6 +394,7 @@ export default function LotDetailPage() {
                             evidence={lot.evidence}
                             lotId={lot.lot_id}
                             verification={v ? { decision: v.decision, verified_at: v.verified_at } : null}
+                            onVerify={(decision) => handleVerifyObservation("hazard", signal.signal_id, decision)}
                           />
                         );
                       })}
@@ -585,9 +654,20 @@ function UncertaintySummary({ items, signals }: { items: MaterialItem[]; signals
   );
 }
 
-function ItemCard({ item, evidence, lotId, verification }: { item: MaterialItem; evidence: Evidence[]; lotId: string; verification?: { decision: string; verified_at: string } | null }) {
+function ItemCard({
+  item,
+  evidence,
+  lotId,
+  verification,
+  onVerify,
+}: {
+  item: MaterialItem;
+  evidence: Evidence[];
+  lotId: string;
+  verification?: { decision: string; verified_at: string } | null;
+  onVerify?: (decision: "confirmed" | "rejected" | "cannot_determine") => void;
+}) {
   const linkedEvidence = evidence.filter((e) => item.evidence_ids.includes(e.evidence_id));
-  const needsReview = item.uncertainty_level === "low" || item.uncertainty_level === "medium";
 
   return (
     <div className={`bg-[#0a0a0a] border rounded-md p-3 ${
@@ -638,23 +718,47 @@ function ItemCard({ item, evidence, lotId, verification }: { item: MaterialItem;
           </div>
         </div>
       )}
-      {needsReview && !verification && (
-        <div className="mt-2 pt-2 border-t border-[#1a1a1a]">
-          <a
-            href={`/review/${lotId}?target=material:${item.item_id}`}
-            className="text-[10px] text-[#3b82f6] hover:text-[#60a5fa] transition-colors"
+      {!verification && onVerify && (
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#1a1a1a]">
+          <span className="text-[10px] text-[#666]">Review observation:</span>
+          <button
+            onClick={() => onVerify("confirmed")}
+            className="px-2.5 py-1 bg-[#052e16] border border-[#14532d] text-[#22c55e] hover:bg-[#14532d] rounded text-[10px] font-medium transition-colors flex items-center gap-1"
           >
-            Review this observation →
-          </a>
+            ✓ Confirm
+          </button>
+          <button
+            onClick={() => onVerify("rejected")}
+            className="px-2.5 py-1 bg-[#450a0a] border border-[#7f1d1d] text-[#ef4444] hover:bg-[#7f1d1d] rounded text-[10px] font-medium transition-colors flex items-center gap-1"
+          >
+            ✗ Reject
+          </button>
+          <button
+            onClick={() => onVerify("cannot_determine")}
+            className="px-2.5 py-1 bg-[#422006] border border-[#78350f] text-[#f59e0b] hover:bg-[#78350f] rounded text-[10px] font-medium transition-colors"
+          >
+            ? Inconclusive
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-function HazardCard({ signal, evidence, lotId, verification }: { signal: HazardSignal; evidence: Evidence[]; lotId: string; verification?: { decision: string; verified_at: string } | null }) {
+function HazardCard({
+  signal,
+  evidence,
+  lotId,
+  verification,
+  onVerify,
+}: {
+  signal: HazardSignal;
+  evidence: Evidence[];
+  lotId: string;
+  verification?: { decision: string; verified_at: string } | null;
+  onVerify?: (decision: "confirmed" | "rejected" | "cannot_determine") => void;
+}) {
   const linkedEvidence = evidence.filter((e) => signal.evidence_ids.includes(e.evidence_id));
-  const needsReview = signal.review_required || signal.uncertainty_level === "low" || signal.uncertainty_level === "medium";
 
   return (
     <div className={`bg-[#422006]/30 border rounded-md p-3 ${
@@ -698,14 +802,27 @@ function HazardCard({ signal, evidence, lotId, verification }: { signal: HazardS
           </div>
         </div>
       )}
-      {needsReview && !verification && (
-        <div className="mt-2 pt-2 border-t border-[#78350f]/30">
-          <a
-            href={`/review/${lotId}?target=hazard:${signal.signal_id}`}
-            className="text-[10px] text-[#3b82f6] hover:text-[#60a5fa] transition-colors"
+      {!verification && onVerify && (
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#78350f]/30">
+          <span className="text-[10px] text-[#666]">Review hazard signal:</span>
+          <button
+            onClick={() => onVerify("confirmed")}
+            className="px-2.5 py-1 bg-[#052e16] border border-[#14532d] text-[#22c55e] hover:bg-[#14532d] rounded text-[10px] font-medium transition-colors flex items-center gap-1"
           >
-            Review this signal →
-          </a>
+            ✓ Confirm
+          </button>
+          <button
+            onClick={() => onVerify("rejected")}
+            className="px-2.5 py-1 bg-[#450a0a] border border-[#7f1d1d] text-[#ef4444] hover:bg-[#7f1d1d] rounded text-[10px] font-medium transition-colors flex items-center gap-1"
+          >
+            ✗ Reject
+          </button>
+          <button
+            onClick={() => onVerify("cannot_determine")}
+            className="px-2.5 py-1 bg-[#422006] border border-[#78350f] text-[#f59e0b] hover:bg-[#78350f] rounded text-[10px] font-medium transition-colors"
+          >
+            ? Inconclusive
+          </button>
         </div>
       )}
     </div>
