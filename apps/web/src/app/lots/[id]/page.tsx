@@ -73,17 +73,7 @@ export default function LotDetailPage() {
       if (!res.ok) {
         throw new Error(data.error || "Routing evaluation failed");
       }
-      setLot((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: data.routing?.recommended_facility_id && !data.routing?.routing_blocked ? "routed" : data.safety?.blocked ? "blocked" : "routing",
-              safety_result: data.safety ?? null,
-              routing_result: data.routing ?? null,
-              selected_facility_id: data.routing?.recommended_facility_id ?? null,
-            }
-          : prev
-      );
+      await fetchLot();
     } catch (err) {
       setRoutingError(err instanceof Error ? err.message : "Routing failed");
     } finally {

@@ -34,8 +34,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const PUBLIC_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
     if (!existsSync(UPLOAD_DIR)) {
       await mkdir(UPLOAD_DIR, { recursive: true });
+    }
+    if (!existsSync(PUBLIC_UPLOAD_DIR)) {
+      await mkdir(PUBLIC_UPLOAD_DIR, { recursive: true });
     }
 
     const evidenceId = `EVD-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -44,6 +48,11 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(path.join(UPLOAD_DIR, filename), buffer);
+    try {
+      await writeFile(path.join(PUBLIC_UPLOAD_DIR, filename), buffer);
+    } catch {
+      // ignore public directory copy errors if permissions restricted
+    }
 
     const evidence: Evidence = {
       evidence_id: evidenceId,
