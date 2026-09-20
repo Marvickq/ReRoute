@@ -181,7 +181,11 @@ export default function NewLotPage() {
       const evidenceIds: string[] = [];
 
       for (const photo of photos) {
-        if (photo.error || photo.uploaded) continue;
+        if (photo.error) continue;
+        if (photo.uploaded && photo.evidence) {
+          evidenceIds.push(photo.evidence.evidence_id);
+          continue;
+        }
         setPhotos((prev) =>
           prev.map((p) => (p.id === photo.id ? { ...p, uploading: true } : p))
         );
@@ -206,20 +210,24 @@ export default function NewLotPage() {
         }
       }
 
-      if (voice && !voice.uploaded) {
-        setVoice((prev) => (prev ? { ...prev, uploading: true } : prev));
-        try {
-          const ev = await uploadEvidence(voice);
-          if (ev) {
-            evidenceIds.push(ev.evidence_id);
-            setVoice((prev) => (prev ? { ...prev, uploading: false, uploaded: true, evidence: ev } : prev));
+      if (voice) {
+        if (voice.uploaded && voice.evidence) {
+          evidenceIds.push(voice.evidence.evidence_id);
+        } else if (!voice.uploaded && !voice.error) {
+          setVoice((prev) => (prev ? { ...prev, uploading: true } : prev));
+          try {
+            const ev = await uploadEvidence(voice);
+            if (ev) {
+              evidenceIds.push(ev.evidence_id);
+              setVoice((prev) => (prev ? { ...prev, uploading: false, uploaded: true, evidence: ev } : prev));
+            }
+          } catch (err) {
+            setVoice((prev) =>
+              prev
+                ? { ...prev, uploading: false, error: err instanceof Error ? err.message : "Upload failed" }
+                : prev
+            );
           }
-        } catch (err) {
-          setVoice((prev) =>
-            prev
-              ? { ...prev, uploading: false, error: err instanceof Error ? err.message : "Upload failed" }
-              : prev
-          );
         }
       }
 
