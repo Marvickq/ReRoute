@@ -77,9 +77,33 @@ export function evaluateFacility(
     };
   }
 
-  const materialCompatible = materialCategories.some((cat) =>
-    facility.accepted_materials.includes(cat)
-  );
+  const normalizeCategory = (cat: string): string[] => {
+    const raw = cat.toLowerCase().replace(/_/g, " ").trim();
+    const categories: string[] = [raw];
+
+    if (raw.includes("desktop") || raw.includes("computer") || raw.includes("pc")) categories.push("desktop", "laptop");
+    if (raw.includes("laptop") || raw.includes("notebook")) categories.push("laptop");
+    if (raw.includes("phone") || raw.includes("mobile") || raw.includes("smartphone")) categories.push("mobile_phone");
+    if (raw.includes("tablet") || raw.includes("ipad")) categories.push("tablet");
+    if (raw.includes("monitor") || raw.includes("display") || raw.includes("screen")) categories.push("monitor");
+    if (raw.includes("printer") || raw.includes("scanner")) categories.push("printer");
+    if (raw.includes("battery")) categories.push("battery", "lithium_battery");
+    if (raw.includes("cable") || raw.includes("wire") || raw.includes("cord")) categories.push("cable");
+    if (raw.includes("charger") || raw.includes("adapter")) categories.push("charger");
+    if (raw.includes("circuit") || raw.includes("board") || raw.includes("pcb")) categories.push("circuit_board");
+    if (raw.includes("tv") || raw.includes("television") || raw.includes("crt")) categories.push("crt_tv", "monitor");
+
+    return categories;
+  };
+
+  const materialCompatible =
+    materialCategories.length === 0 ||
+    materialCategories.some((cat) => {
+      const normalizedMatches = normalizeCategory(cat);
+      return facility.accepted_materials.some((acc) =>
+        normalizedMatches.some((norm) => norm === acc || norm.includes(acc) || acc.includes(norm))
+      );
+    });
 
   if (!materialCompatible) {
     return {

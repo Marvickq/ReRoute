@@ -129,10 +129,10 @@ export default function LotDetailPage() {
 
   const photos = lot.evidence.filter((e) => e.type === "photo");
   const voices = lot.evidence.filter((e) => e.type === "voice");
-  const hasAnalysis = lot.status === "analyzed" && lot.analysis;
+  const hasAnalysis = Boolean(lot.analysis);
   const hasRouting = lot.routing_result !== null;
-  const canAnalyze = lot.status === "created" && (lot.evidence.length > 0 || lot.text_description);
-  const canRoute = hasAnalysis && !hasRouting && areAllRequiredObservationsVerified(lot);
+  const canAnalyze = (lot.status === "created" || lot.status === "analysis_failed") && (lot.evidence.length > 0 || lot.text_description);
+  const canRoute = hasAnalysis && !hasRouting && lot.status !== "blocked" && areAllRequiredObservationsVerified(lot);
   const canDispatch = lot.status === "routed";
   const canReceive = lot.status === "dispatched";
 
