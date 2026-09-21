@@ -152,7 +152,7 @@ function handleVerify(lot: MaterialLot, metadata: Record<string, unknown>): Tran
 function handleUnblock(lot: MaterialLot, metadata: Record<string, unknown>): TransitionResult {
   const currentStatus = lot.status;
 
-  const UNBLOCKABLE_STATUSES: LotStatus[] = ["blocked", "safety_review", "review_required", "analyzed"];
+  const UNBLOCKABLE_STATUSES: LotStatus[] = ["blocked", "safety_review", "review_required", "analyzed", "verified", "routing"];
   if (!UNBLOCKABLE_STATUSES.includes(currentStatus)) {
     return {
       success: false,

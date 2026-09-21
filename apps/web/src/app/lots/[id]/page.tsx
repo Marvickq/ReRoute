@@ -156,9 +156,18 @@ export default function LotDetailPage() {
       if (!res.ok) {
         throw new Error(data.error || "Transition failed");
       }
+      // Update lot state from the server response first
       setLot(data.lot);
       if (action === "unblock") {
-        await handleGetRouting();
+        // After unblock clears safety block, re-evaluate routing
+        // Small delay to ensure state update propagates
+        setTimeout(async () => {
+          try {
+            await handleGetRouting();
+          } catch (err) {
+            console.error("Routing re-evaluation after unblock failed:", err);
+          }
+        }, 100);
       }
     } catch (err) {
       setTransitionError(err instanceof Error ? err.message : "Transition failed");
@@ -195,10 +204,10 @@ export default function LotDetailPage() {
   const hasAnalysis = Boolean(lot.analysis);
   const hasRouting = lot.routing_result !== null;
   const canAnalyze = (lot.status === "created" || lot.status === "analysis_failed") && (lot.evidence.length > 0 || lot.text_description);
-  const canRoute = hasAnalysis && !hasRouting && lot.status !== "blocked" && areAllRequiredObservationsVerified(lot);
+  const canRoute = hasAnalysis && !lot.safety_result?.blocked && areAllRequiredObservationsVerified(lot) && lot.status !== "routed" && lot.status !== "dispatched" && lot.status !== "received";
   const canDispatch = lot.status === "routed";
   const canReceive = lot.status === "dispatched";
-  const canUnblock = lot.status === "blocked";
+  const canUnblock = lot.status === "blocked" || lot.safety_result?.blocked === true;
 
   const lifecycleSteps = getLifecycleSteps(lot);
 
@@ -435,12 +444,13 @@ export default function LotDetailPage() {
               Safety & Routing
             </h3>
 
-            {(lot.status === "blocked" || lot.safety_result?.blocked) && (
+            {/* Safety Blocked Banner — only when safety evaluation was run and returned blocked */}
+            {lot.safety_result?.blocked && (
               <div className="bg-[#450a0a]/50 border border-[#7f1d1d] rounded-md p-4 mb-4">
                 <div className="flex items-center gap-2 text-[#ef4444] font-medium text-[13px] mb-2">
-                  <span>🚫 Safety Evaluation Blocked</span>
+                  <span>🚫 Routing Blocked</span>
                 </div>
-                {lot.safety_result?.blocking_reasons && lot.safety_result.blocking_reasons.length > 0 && (
+                {lot.safety_result.blocking_reasons.length > 0 && (
                   <ul className="list-disc list-inside text-[12px] text-[#fca5a5] space-y-1 mb-3">
                     {lot.safety_result.blocking_reasons.map((r, idx) => (
                       <li key={idx}>{r}</li>
@@ -455,11 +465,12 @@ export default function LotDetailPage() {
                   disabled={transitionLoading}
                   className="px-4 py-2 bg-[#422006] border border-[#78350f] rounded-md text-[12px] font-medium text-[#f59e0b] hover:bg-[#78350f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                 >
-                  🔓 Unblock & Re-Evaluate Lot (Inspector Override)
+                  {transitionLoading ? "Processing..." : "🔓 Unblock & Re-Evaluate Lot (Inspector Override)"}
                 </button>
               </div>
             )}
 
+            {/* Evaluate Safety & Routing button — only when all verifications are done */}
             {canRoute && (
               <div className="py-4 text-center">
                 <p className="text-[11px] text-[#444] mb-3">
@@ -481,7 +492,8 @@ export default function LotDetailPage() {
               </div>
             )}
 
-            {lot.safety_result && lot.status !== "blocked" && (
+            {/* Safety result details — only when safety passed (blocked case handled by banner above) */}
+            {lot.safety_result && !lot.safety_result.blocked && (
               <SafetyResultCard safety={lot.safety_result} />
             )}
 
@@ -957,20 +969,9 @@ function SafetyResultCard({ safety }: { safety: SafetyResult }) {
         </div>
       )}
 
-      {safety.blocked && (
-        <div className="bg-[#450a0a]/30 border border-[#7f1d1d]/50 rounded-md px-3 py-2">
-          <span className="text-[11px] text-[#ef4444] font-medium">Routing blocked</span>
-          <div className="mt-1 space-y-0.5">
-            {safety.blocking_reasons.map((reason, i) => (
-              <p key={i} className="text-[10px] text-[#ef4444]/80">- {reason}</p>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!safety.blocked && !safety.requires_human_review && (
+      {!safety.requires_human_review && (
         <div className="bg-[#052e16]/30 border border-[#14532d]/50 rounded-md px-3 py-2">
-          <span className="text-[11px] text-[#22c55e]">Safety check passed</span>
+          <span className="text-[11px] text-[#22c55e]">Safety check passed ✓</span>
         </div>
       )}
     </div>

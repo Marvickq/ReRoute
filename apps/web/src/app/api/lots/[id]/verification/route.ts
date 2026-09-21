@@ -4,9 +4,9 @@ import {
   getVerificationsForLot,
   getVerificationForTarget,
   storeVerification,
+  syncLotToCloud,
 } from "@/lib/store";
 import { transitionLot, areAllRequiredObservationsVerified } from "@/lib/lifecycle";
-import { evaluateSafety } from "@/lib/safety";
 import type { Verification, VerificationDecision } from "@/types";
 
 const VALID_DECISIONS: VerificationDecision[] = ["confirmed", "rejected", "cannot_determine"];
@@ -96,19 +96,17 @@ export async function POST(
       );
     }
 
-    // Re-evaluate safety rules after storing verification
-    const safetyResult = evaluateSafety(lot);
-    lot.safety_result = safetyResult;
-
-    if (!safetyResult.blocked) {
-      const allVerified = areAllRequiredObservationsVerified(lot);
-      if (allVerified || body.decision === "rejected") {
-        if (lot.status === "blocked" || lot.status === "safety_review" || lot.status === "review_required" || lot.status === "analyzed") {
-          lot.status = "verified";
-        }
+    // Only advance lot status — do NOT run safety evaluation here.
+    // Safety evaluation should only happen when user explicitly clicks
+    // "Evaluate Safety & Routing" (the routing endpoint).
+    const allVerified = areAllRequiredObservationsVerified(lot);
+    if (allVerified) {
+      if (lot.status === "review_required" || lot.status === "analyzed" || lot.status === "safety_review") {
+        lot.status = "verified";
       }
-    } else {
-      lot.status = "blocked";
+    } else if (lot.status === "analyzed") {
+      // Move to review_required if there are still unverified observations
+      lot.status = "review_required";
     }
 
     try {
@@ -121,6 +119,8 @@ export async function POST(
     } catch (err) {
       console.error("[Verification] Transition error:", err);
     }
+
+    syncLotToCloud(lot);
 
     const verifications = getVerificationsForLot(id);
 
