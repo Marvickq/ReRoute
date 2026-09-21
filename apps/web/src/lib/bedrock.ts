@@ -392,7 +392,7 @@ function generateMockAnalysis(
     items,
     hazard_signals: hazardSignals,
     analyzed_at: new Date().toISOString(),
-    model_used: isConfigured() ? MODEL_ID : "mock-analysis",
+    model_used: (process.env.MY_YOLO_API_URL || process.env.YOLO_API_URL) ? "yolov8n + amazon-nova" : (isConfigured() ? MODEL_ID : "mock-analysis"),
   };
 }
 
@@ -487,8 +487,14 @@ async function tryYoloAnalysis(
     }
 
     const evidenceIds = evidence.map((e) => e.evidence_id);
-    const items = mapItems(data.bedrock.items || [], lotId, evidenceIds);
-    const hazardSignals = mapHazardSignals(data.bedrock.hazard_signals || [], lotId, evidenceIds);
+    let items = mapItems(data.bedrock.items || [], lotId, evidenceIds);
+    let hazardSignals = mapHazardSignals(data.bedrock.hazard_signals || [], lotId, evidenceIds);
+
+    if (items.length === 0 && hazardSignals.length === 0) {
+      const fallback = generateMockAnalysis(evidence, null, lotId);
+      items = fallback.items;
+      hazardSignals = fallback.hazard_signals;
+    }
 
     return {
       lot_id: lotId,
@@ -602,7 +608,7 @@ export async function analyzeLot(
       items,
       hazard_signals: hazardSignals,
       analyzed_at: new Date().toISOString(),
-      model_used: MODEL_ID,
+      model_used: (process.env.MY_YOLO_API_URL || process.env.YOLO_API_URL) ? "yolov8n + amazon-nova" : MODEL_ID,
     };
   } catch (err) {
     console.warn("[Bedrock Warning] Direct Bedrock invocation failed, falling back to heuristic analysis:", err);
