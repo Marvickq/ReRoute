@@ -39,6 +39,8 @@ export default function LotDetailPage() {
 
   useEffect(() => {
     fetchLot();
+    // Pre-warm Render YOLO microservice in background so it is awake when user clicks Analyze
+    fetch("https://reloop-yolo.onrender.com/", { mode: "no-cors" }).catch(() => {});
   }, [fetchLot]);
 
   const handleAnalyze = async () => {

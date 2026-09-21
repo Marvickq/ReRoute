@@ -473,7 +473,7 @@ async function tryYoloAnalysis(
       method: "POST",
       headers,
       body: formData,
-      signal: AbortSignal.timeout(8000), // 8s timeout for AWS Amplify serverless Lambda compatibility
+      signal: AbortSignal.timeout(12000), // 12s timeout for YOLO detection + Bedrock interpretation
     });
 
     if (!res.ok) {
