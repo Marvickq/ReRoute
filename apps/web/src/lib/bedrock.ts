@@ -371,13 +371,13 @@ function generateMockAnalysis(
     }
   }
 
-  if (items.length === 0 && evidence.length > 0) {
-    const confidence = 0.5;
+  if (items.length === 0) {
+    const confidence = 0.75;
     items.push({
       item_id: `ITEM-${Date.now()}-1`,
       lot_id: lotId,
       category: "mixed_electronics",
-      quantity: evidence.length,
+      quantity: Math.max(1, evidence.length),
       condition: "unknown",
       battery_present: false,
       components: [],
@@ -473,7 +473,7 @@ async function tryYoloAnalysis(
       method: "POST",
       headers,
       body: formData,
-      signal: AbortSignal.timeout(60000), // 60s timeout for Render free-tier cold starts
+      signal: AbortSignal.timeout(8000), // 8s timeout for AWS Amplify serverless Lambda compatibility
     });
 
     if (!res.ok) {
