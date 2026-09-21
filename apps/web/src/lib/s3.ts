@@ -87,3 +87,24 @@ export async function getS3PresignedUrl(s3Key: string, expiresInSeconds = 3600):
 
   return await getSignedUrl(client, command, { expiresIn: expiresInSeconds });
 }
+
+/**
+ * Fetches object from Amazon S3 directly as a Buffer
+ */
+export async function fetchFromS3(s3Key: string): Promise<Buffer | null> {
+  if (!isS3Configured()) return null;
+  try {
+    const { bucketName } = getS3Config();
+    const client = getS3Client();
+    const key = s3Key.includes("/") ? s3Key : `evidence/${s3Key}`;
+    const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
+    const response = await client.send(command);
+    if (response.Body) {
+      const byteArray = await response.Body.transformToByteArray();
+      return Buffer.from(byteArray);
+    }
+  } catch (err) {
+    console.warn("[S3 Fetch Warning] Could not fetch key from S3:", s3Key, err);
+  }
+  return null;
+}
