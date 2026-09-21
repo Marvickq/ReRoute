@@ -1,45 +1,42 @@
 import os
+import torch
+import gc
 from ultralytics import YOLO
+
+# Limit PyTorch CPU threads to 1 to reduce RAM memory usage on Render (512MB limit)
+torch.set_num_threads(1)
 
 MODEL_PATH = "runs/detect/train-11/weights/best.pt"
 
-if os.path.exists(MODEL_PATH):
-    model = YOLO(MODEL_PATH)
-else:
-    model = YOLO("yolov8n.pt")
+_model = None
 
+def get_model():
+    global _model
+    if _model is None:
+        if os.path.exists(MODEL_PATH):
+            _model = YOLO(MODEL_PATH)
+        else:
+            _model = YOLO("yolov8n.pt")
+    return _model
 
 def detect(image_path: str):
-    results = model(image_path)
-
+    model = get_model()
     detections = []
 
-    for result in results:
-        for box in result.boxes:
-            class_id = int(box.cls[0])
+    with torch.inference_mode():
+        results = model(image_path, verbose=False)
+        for result in results:
+            for box in result.boxes:
+                class_id = int(box.cls[0])
+                detections.append({
+                    "class_name": result.names[class_id],
+                    "confidence": round(float(box.conf[0]), 4),
+                    "bbox": [round(x, 2) for x in box.xyxy[0].tolist()]
+                })
 
-            detections.append({
-                "class_name": result.names[class_id],
-                "confidence": round(float(box.conf[0]), 4),
-                "bbox": [round(x, 2) for x in box.xyxy[0].tolist()]
-            })
-
+    gc.collect()
     return detections
 
-
 if __name__ == "__main__":
-
-    image_path = "dataset/test/images/Mobile_20_jpg.rf.4275e73271acae0aa6f3a600283a91dc.jpg"
-
-    print("Loading YOLO...")
-    print("Testing image:", image_path)
-
-    detections = detect(image_path)
-
-    print("\nDetections:")
-
-    if not detections:
-        print("No objects detected.")
-    else:
-        for detection in detections:
-            print(detection)
+    print("Testing YOLO detector locally...")
+    print("Model initialized successfully.")
