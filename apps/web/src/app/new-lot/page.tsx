@@ -175,8 +175,8 @@ export default function NewLotPage() {
   };
 
   const hasAnyEvidence =
-    photos.some((p) => p.uploaded && !p.error) ||
-    voice?.uploaded ||
+    photos.some((p) => !p.error) ||
+    voice !== null ||
     textDescription.trim().length > 0;
 
   const allUploaded =
