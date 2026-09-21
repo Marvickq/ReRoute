@@ -432,11 +432,18 @@ async function tryYoloAnalysis(
     const blob = new Blob([new Uint8Array(fileBuffer)], { type: photo.mime_type || "image/jpeg" });
     formData.append("file", blob, photo.original_filename);
 
+    const { accessKeyId, secretAccessKey, region } = getAwsCredentials();
+    const headers: Record<string, string> = {};
+    if (accessKeyId) headers["x-aws-access-key-id"] = accessKeyId;
+    if (secretAccessKey) headers["x-aws-secret-access-key"] = secretAccessKey;
+    if (region) headers["x-aws-region"] = region;
+
     console.log(`[YOLO API] Sending material analysis request to: ${yoloUrl}`);
     const res = await fetch(yoloUrl, {
       method: "POST",
+      headers,
       body: formData,
-      signal: AbortSignal.timeout(8000), // 8s timeout to prevent AWS Amplify Lambda gateway timeouts
+      signal: AbortSignal.timeout(60000), // 60s timeout for Render free-tier cold starts
     });
 
     if (!res.ok) {
