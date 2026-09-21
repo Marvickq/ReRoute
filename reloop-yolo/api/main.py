@@ -1,8 +1,18 @@
+import os
+# Restrict multi-threading BEFORE importing torch/ultralytics to keep RAM < 250MB on Render
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["TORCH_NUM_THREADS"] = "1"
+os.environ["YOLO_VERBOSE"] = "False"
+
+import gc
 from fastapi import FastAPI, UploadFile, File, Header
 from typing import Optional
 from tempfile import NamedTemporaryFile
 import shutil
-import os
 
 from api.detector import detect
 from api.bedrock import interpret_detections, generate_fallback_intelligence
@@ -71,3 +81,4 @@ async def material_analysis(
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+        gc.collect()
