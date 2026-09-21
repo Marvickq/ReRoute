@@ -317,7 +317,14 @@ export default function LotDetailPage() {
           {/* AI Material Understanding */}
           <div className="bg-[#111] border border-[#2a2a2a] rounded-lg p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[13px] font-medium text-[#f0f0f0]">AI Material Understanding</h3>
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-[13px] font-medium text-[#f0f0f0]">AI Material Understanding</h3>
+                {hasAnalysis && (
+                  <span className="px-2 py-0.5 bg-[#1e3a5f]/60 border border-[#3b82f6]/40 text-[#60a5fa] rounded text-[10px] font-mono font-medium">
+                    {lot.analysis!.model_used}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {hasAnalysis && (
                   lot.analysis!.items.some((i) => !lot.verifications.some((v) => v.target_type === "material" && v.target_id === i.item_id)) ||
@@ -537,6 +544,10 @@ export default function LotDetailPage() {
               </div>
               {hasAnalysis && (
                 <>
+                  <div className="flex items-center justify-between text-[12px]">
+                    <span className="text-[#666]">Model</span>
+                    <span className="text-[#60a5fa] font-mono text-[11px] font-medium">{lot.analysis!.model_used}</span>
+                  </div>
                   <div className="flex items-center justify-between text-[12px]">
                     <span className="text-[#666]">Items Detected</span>
                     <span className="text-[#a0a0a0]">{lot.analysis!.items.length}</span>
