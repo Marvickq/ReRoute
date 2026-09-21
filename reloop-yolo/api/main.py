@@ -32,8 +32,12 @@ async def material_analysis(
         temp_path = temp.name
 
     try:
-        # Step 1: YOLO detection
-        detections = detect(temp_path)
+        # Step 1: YOLO detection (with exception guard)
+        detections = []
+        try:
+            detections = detect(temp_path)
+        except Exception as det_err:
+            print(f"[YOLO API Warning] Detection failed: {det_err}")
 
         # Step 2: Bedrock interpretation (with detection-based fallback)
         try:
@@ -55,6 +59,14 @@ async def material_analysis(
                 "detections": detections
             },
             "bedrock": material_intelligence
+        }
+    except Exception as fatal_err:
+        print(f"[YOLO API Fatal Error] {fatal_err}")
+        return {
+            "success": True,
+            "filename": file.filename,
+            "yolo": { "detections": [] },
+            "bedrock": generate_fallback_intelligence([])
         }
     finally:
         if os.path.exists(temp_path):
