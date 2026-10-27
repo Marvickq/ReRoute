@@ -1,753 +1,544 @@
 # ♻️ ReRoute
 
-### Turning discarded electronics into traceable material.
+### Evidence-driven e-waste inspection and traceability
 
-ReRoute is an AI-assisted e-waste material intelligence and traceability platform that helps transform messy physical e-waste into **structured, verified, routable material records**.
+ReRoute turns physical e-waste evidence into structured material records
+that can be reviewed, routed, and tracked through a Digital Material
+Passport.
 
-Instead of treating e-waste as an anonymous pile of objects, ReRoute creates a digital record around each material lot — from initial capture and AI analysis to human verification, safety decisions, routing, and a Digital Material Passport.
+> **AI interprets evidence. Humans resolve uncertainty. Deterministic
+> rules control the workflow. The audit trail records the journey.**
 
-> AI interprets the ambiguity. Deterministic systems control what happens next.
 
----
+**Core technologies:** OpenCV 5, YOLOv8, FastAPI, Next.js, Amazon
+Bedrock\
+**Important deployment note:** The web app and vision service are
+separate deployments. The FastAPI/OpenCV/YOLO vision service currently
+runs on **Render, not AWS**. AWS integrations are
+configuration-dependent and must be verified in the target environment
+before being described as live.
 
-## 🌐 Live Demo
+------------------------------------------------------------------------
 
-[Add your deployed ReRoute URL here]
+## Contents
 
----
+-   [Problem and solution](#problem-and-solution)
+-   [Key capabilities](#key-capabilities)
+-   [Architecture](#architecture)
+-   [Agentic inspection loop](#agentic-inspection-loop)
+-   [Technology stack](#technology-stack)
+-   [Repository layout](#repository-layout)
+-   [Prerequisites](#prerequisites)
+-   [Pinned dependencies](#pinned-dependencies)
+-   [Local development](#local-development)
+-   [Configuration](#configuration)
+-   [Tests and evaluation](#tests-and-evaluation)
+-   [Deployment](#deployment)
+-   [Limitations and responsible use](#limitations-and-responsible-use)
 
-## 📌 Table of Contents
 
-| Section | What You'll Find |
-|---|---|
-| 🌍 [Problem](#-the-problem) | Why e-waste is difficult to identify and route |
-| 💡 [Insight](#-the-insight) | The information gap inside the physical waste stream |
-| 🚀 [Solution](#-the-solution) | How ReRoute structures e-waste |
-| ✨ [Key Features](#-key-features) | Core product capabilities |
-| 🧠 [Intelligence Flow](#-intelligence-flow) | End-to-end ReRoute workflow |
-| 🤖 [AI Boundary](#-ai--with-a-boundary) | What AI does and what deterministic systems control |
-| 👁️ [YOLO Detection](#️-yolo-detection) | Computer-vision layer |
-| 👩‍💻 [Human Verification](#-human-verification) | Human-in-the-loop review |
-| 🛡️ [Safety & Routing](#️-safety--routing) | Deterministic decision layer |
-| 🪪 [Material Passport](#-digital-material-passport) | Traceable material record |
-| 🏗️ [AWS Architecture](#️-aws-architecture) | Cloud system structure |
-| 🛠️ [Tech Stack](#️-tech-stack) | Technologies used |
-| 🔄 [Lifecycle](#-material-lifecycle) | Material state transitions |
-| 🚧 [Challenges](#-challenges) | Problems encountered while building |
-| 🚀 [Roadmap](#-roadmap) | What's next |
-| ⚙️ [Setup](#️-local-setup) | Run ReRoute locally |
-| 🎬 [Demo Flow](#-collector-workflow) | Recommended demonstration |
-| 💭 [Bigger Idea](#-the-bigger-idea) | Why ReRoute exists |
+------------------------------------------------------------------------
 
----
+## Problem and solution
 
-## 🌍 The Problem
+E-waste often arrives mixed, damaged, or poorly documented. Before it
+can be responsibly handled, operators need evidence about visible
+objects, material characteristics, uncertainty, required review, and
+compatible downstream facilities.
 
-E-waste does not arrive as clean, structured data.
+ReRoute links the journey:
 
-A collector may receive:
+**Capture → Image quality gate → Object detection → Structured
+interpretation → Human verification → Deterministic safety checks →
+Facility routing → Lifecycle tracking → Digital Material Passport**
 
-- A damaged smartphone
-- A laptop with an unknown battery condition
-- Mixed circuit boards
-- Old monitors
-- Loose batteries
-- Multiple electronic components in one lot
+The prototype uses synthetic facility data. It does not claim that a
+photo alone can establish hidden chemical composition, exact weight,
+battery condition, or whether an item is safe.
 
-Before material can be responsibly handled, someone needs to understand:
+## Key capabilities
 
-- What is it?
-- How much is there?
-- What condition is it in?
-- Does it contain a battery?
-- Are there hazards?
-- Who can handle it?
-- Where should it go?
-- What happened to it afterwards?
+-   **Evidence capture:** photo, text, and voice-note workflow.
+-   **OpenCV quality gate:** image decoding, resolution, blur, exposure,
+    and clipping checks.
+-   **Visual evidence:** annotated images and crops associated with
+    detections.
+-   **YOLO detection:** visible-object classes, confidence values, and
+    bounding boxes.
+-   **Bounded inspection loop:** image quality and detector results
+    influence the next step.
+-   **Human verification:** uncertain results require operator review.
+-   **Deterministic controls:** unresolved inspection and safety states
+    block downstream actions.
+-   **Material traceability:** lot lifecycle, evidence, decisions, and
+    Digital Material Passport.
+-   **Cloud integrations:** S3, DynamoDB, Bedrock, EventBridge, and
+    related services when correctly configured.
 
-The physical stream is messy. Formal recycling workflows require structured information.
+------------------------------------------------------------------------
 
-> **The challenge is turning ambiguous physical material into information that can be verified and acted upon.**
+## Architecture
 
----
+The diagram distinguishes the AWS application/integration layer from the
+separately hosted vision service. Solid arrows show the intended data
+flow; actual cloud integration depends on environment configuration.
 
-## 💡 The Insight
+``` mermaid
+flowchart LR
+    U["Collector / Inspector<br/>Photo · Voice · Text"] --> WEB
 
-Most e-waste systems focus on one part of the journey:
+    subgraph AWS["AWS application and integration layer"]
+        WEB["AWS Amplify<br/>Next.js web app / API routes"]
+        GUARD["Deterministic controls<br/>Safety · Lifecycle · Inspection guard"]
+        S3[("Amazon S3<br/>Evidence files")]
+        DDB[("Amazon DynamoDB<br/>Lots · Passport · Audit")]
+        EB["Amazon EventBridge"]
+        SF["AWS Step Functions"]
+        LAMBDA["API Gateway + Lambda<br/>(where deployed/configured)"]
+        BR["Amazon Bedrock<br/>Nova Pro"]
+        CW["Amazon CloudWatch"]
+        TR["Amazon Transcribe"]
+        WEB --> GUARD
+        WEB -. configured integration .-> S3
+        WEB -. configured integration .-> DDB
+        WEB -. configured integration .-> EB
+        EB -. configured integration .-> SF
+        WEB -. configured integration .-> TR
+        WEB -. configured integration .-> LAMBDA
+        WEB -. configured integration .-> BR
+        SF -. configured integration .-> BR
+        WEB -. logs/observability .-> CW
+    end
 
-```
-Collection → Marketplace → Recycling
-```
+    WEB -->|"inspection request / image"| VISION
 
-But the difficult part happens *between* these stages. A physical object needs to become a structured material record before downstream decisions can be made reliably.
+    subgraph RENDER["Separate vision service — Render, not AWS"]
+        VISION["FastAPI service"]
+        QUALITY["OpenCV 5<br/>Decode · Quality gate · CLAHE · Crops · Annotation"]
+        YOLO["YOLOv8<br/>Class · Confidence · Bounding box"]
+        LOOP["Bounded inspection loop<br/>Observe → Decide → Act → Outcome"]
+        RESULT["Inspection result<br/>Ready for human · Review · Retake"]
+        VISION --> QUALITY --> LOOP
+        LOOP --> YOLO
+        YOLO --> LOOP
+        LOOP --> RESULT
+    end
 
-This led to a simple idea:
-
-> **What if the first step in e-waste handling was creating a trustworthy digital representation of the material itself?**
-
-ReRoute is built around that representation.
-
----
-
-## 🚀 The Solution
-
-ReRoute creates a structured workflow around each material lot:
-
-```
-Physical E-Waste
-    ↓
-Capture
-    ↓
-AI Analysis
-    ↓
-Structured Material Record
-    ↓
-Uncertainty
-    ↓
-Human Verification
-    ↓
-Safety Decision
-    ↓
-Routing
-    ↓
-Lifecycle Tracking
-    ↓
-Digital Material Passport
-```
-
-The system separates two responsibilities:
-
-- **AI / Intelligence** — interprets ambiguous evidence and structures it
-- **Deterministic Software** — controls what happens next
-
-This prevents an AI model from directly deciding what should happen to potentially hazardous material.
-
----
-
-## ✨ Key Features
-
-| Feature | Description | Purpose |
-|---|---|---|
-| 📦 Material Lots | Create a unique lot for collected e-waste | Organize physical material |
-| 📷 Multimodal Capture | Photo, voice and text evidence | Capture messy real-world input |
-| 👁️ YOLO Detection | Detect visible electronic objects | Computer-vision evidence |
-| 🧠 Bedrock Analysis | Convert evidence into structured material information | Material intelligence |
-| 📊 Confidence & Uncertainty | Classifies analysis confidence | Makes uncertainty visible |
-| 🔎 Evidence Traceability | Links outputs to source evidence | Explainability |
-| 👩‍💻 Human Verification | Confirm, reject or mark uncertain findings | Human oversight |
-| 🛡️ Safety Engine | Applies deterministic handling rules | Conservative decisions |
-| 🏭 Facility Routing | Matches material against facility capabilities | Route compatible material |
-| 🔄 Lifecycle Tracking | Tracks lot state from creation to receipt | Operational visibility |
-| 🪪 Digital Material Passport | Structured record of the material journey | Traceability |
-| ☁️ AWS Infrastructure | Bedrock, S3, DynamoDB, Lambda and workflow services | Cloud infrastructure |
-
----
-
-## 🧠 Intelligence Flow
-
-ReRoute uses multiple layers rather than relying on a single AI prediction.
-
-```
-Photo / Voice / Text
-    ↓
-Evidence Capture
-    ↓
-YOLO Detection
-    ↓
-Object Evidence
-    ↓
-Amazon Bedrock
-    ↓
-Material Intelligence
-    ↓
-Confidence / Uncertainty
-    ↓
-Human Verification
-    ↓
-Deterministic Safety Rules
-    ↓
-Deterministic Routing
-    ↓
-Material Lifecycle
-    ↓
-Digital Material Passport
+    RESULT -->|"structured result"| WEB
+    WEB --> HUMAN["Human verification"]
+    HUMAN --> GUARD
+    GUARD --> ROUTE["Facility routing<br/>Synthetic facility dataset in prototype"]
+    ROUTE --> LIFE["Lifecycle tracking"]
+    LIFE --> PASS["Digital Material Passport"]
+    GUARD --> AUDIT["Audit trail<br/>Hash-linked events"]
 ```
 
-The central principle is:
+### Architecture notes
 
-> **YOLO sees. Bedrock interprets. Humans verify. Deterministic systems decide. ReRoute records.**
+-   **OpenCV 5** handles image decoding and quality/preprocessing
+    operations. The original image is retained; an enhanced copy is a
+    retry path, not a replacement for the source evidence.
+-   **YOLOv8** supplies visual detections. Detections are evidence, not
+    proof of composition or safety.
+-   **The inspection loop is bounded and rule-driven.** OpenCV/YOLO
+    outcomes influence the next action; deterministic code enforces
+    safety gates. It is not represented as an autonomous LLM agent.
+-   **Amazon Bedrock** is used for structured material interpretation
+    only when credentials, region, model access, and service
+    configuration are valid.
+-   Some AWS integrations may fall back to mock/demo behavior when
+    unconfigured. Do not treat the presence of an integration module as
+    proof of a live AWS deployment.
+-   The current facility dataset is synthetic. Do not present its
+    entries as verified, currently authorized recyclers.
 
----
+## Agentic inspection loop
 
-## 👁️ YOLO Detection
+The loop makes a bounded decision based on observed image quality and
+detection evidence:
 
-ReRoute includes a custom YOLO-based computer-vision layer for identifying visible e-waste objects.
+1.  Assess image quality with OpenCV.
+2.  If the image fails the configured quality gate, request a retake
+    without running detection.
+3.  Otherwise run YOLO and inspect the result.
+4.  If evidence remains weak or ambiguous, use the configured retry path
+    (for example, CLAHE or crop/upscale) within the iteration limit.
+5.  Return one of the explicit outcomes:
+    -   `READY_FOR_HUMAN`
+    -   `HUMAN_REVIEW_REQUIRED`
+    -   `RETAKE_REQUIRED`
+6.  Require human verification and deterministic safety checks before
+    downstream routing or lifecycle actions.
 
-The model provides:
+"Ready for human" means ready for operator verification; it does **not**
+mean the material has been verified as safe.
 
-- Class
-- Confidence
-- Bounding Box
-- Evidence Image
+------------------------------------------------------------------------
 
-Example output:
+## Technology stack
 
-```json
-{
-  "class_name": "Battery",
-  "confidence": 0.9986,
-  "bbox": [31.35, 53.77, 345.32, 248.81]
-}
+  -----------------------------------------------------------------------
+  Layer                               Technologies
+  ----------------------------------- -----------------------------------
+  Web app                             Next.js, React, TypeScript,
+                                      Tailwind CSS
+
+  Vision API                          Python, FastAPI, Uvicorn
+
+  Image processing                    OpenCV 5
+
+  Object detection                    Ultralytics YOLOv8, PyTorch
+
+  Material interpretation             Amazon Bedrock Nova Pro, when
+                                      configured
+
+  Cloud integrations                  AWS Amplify, S3, DynamoDB, API
+                                      Gateway, Lambda, EventBridge, Step
+                                      Functions, CloudWatch, Transcribe
+                                      --- configuration-dependent
+
+  Traceability                        Material-lot records, lifecycle
+                                      states, hash-linked audit events
+  -----------------------------------------------------------------------
+
+## Repository layout
+
+The repository has evolved; verify paths against the checked-out branch
+before relying on these examples.
+
+``` text
+ReRoute/
+├── apps/
+│   └── web/                    # Next.js application
+│       ├── lib/                # Inspection guards, evidence helpers, integrations
+│       └── ...
+├── reloop-yolo/
+│   └── api/
+│       ├── main.py             # FastAPI endpoints
+│       ├── quality.py          # OpenCV quality gate
+│       ├── inspection.py       # Bounded inspection loop
+│       ├── evidence.py         # Annotated images / crops
+│       ├── detector.py         # YOLO integration
+│       └── bedrock.py          # Bedrock integration / fallback
+├── tests/                      # Python tests (location may vary by branch)
+├── docs/
+│   └── OPENCV_INSPECTION.md
+└── README.md
 ```
 
-These detections are not treated as the final material decision. They become **evidence** that can be interpreted alongside other information.
-
----
-
-## 🤖 AI — With a Boundary
-
-ReRoute uses **Amazon Bedrock** as the material intelligence layer.
-
-### AI CAN
-
-- Interpret visual evidence
-- Understand detected objects
-- Structure material information
-- Estimate analysis confidence
-- Identify relevant material characteristics
-- Connect multiple pieces of evidence
-- Provide structured analysis
-
-### AI CANNOT DIRECTLY
-
-- Decide that hazardous material is safe
-- Bypass required human verification
-- Choose a facility without deterministic constraints
-- Override safety rules
-- Replace human verification where review is required
-
-The architecture intentionally separates intelligence from control:
-
-```
-AI
- ↓
-Interpret
- ↓
-Structure
- ↓
-Expose Uncertainty
- ↓
-Human Verification
- ↓
-Deterministic Rules
- ↓
-Action
-```
-
----
-
-## 👩‍💻 Human Verification
-
-AI analysis can be uncertain. Instead of hiding that uncertainty, ReRoute surfaces it.
-
-Verification operators can:
-
-- **Confirm**
-- **Reject**
-- **Cannot Determine**
-
-This creates a human checkpoint before important downstream decisions.
-
-> **When the system is uncertain, uncertainty becomes part of the workflow instead of being hidden.**
-
----
-
-## 🛡️ Safety & Routing
-
-Safety decisions are handled through deterministic rules rather than an LLM.
-
-Examples include:
-
-- Battery detected → Special handling required
-- Hazard signal detected → Human review required
-- Required verification incomplete → Routing blocked
-- Low-confidence material → Review required
-
-The system can therefore distinguish between:
-
-```
-AI uncertainty ≠ Safety decision
-```
-
-This is important because confidence in a model prediction is not the same thing as proof that material is safe.
-
----
-
-## 🏭 Facility Routing
-
-ReRoute currently uses a **synthetic facility dataset** for the prototype.
-
-Facilities have attributes such as:
-
-- Accepted Materials
-- Battery Capability
-- Hazardous Material Capability
-- Capacity
-- Availability
-
-Routing first applies hard constraints:
-
-```
-Material Accepted?
-    ↓
-Handling Capability?
-    ↓
-Capacity Available?
-    ↓
-Facility Available?
-```
-
-Eligible facilities can then be evaluated using prototype routing factors such as:
-
-- Distance
-- Capacity Headroom
-- Handling Capability
-
-> The current facility dataset is synthetic and is used to demonstrate the routing workflow.
-
----
-
-## 🔄 Material Lifecycle
-
-Each material lot moves through a controlled lifecycle:
-
-```
-CREATED
-  ↓
-ANALYZING
-  ↓
-ANALYZED
-  ↓
-SAFETY CHECK
-  ↓
-REVIEW REQUIRED
-  ↓
-VERIFIED
-  ↓
-ROUTING
-  ↓
-DISPATCHED
-  ↓
-RECEIVED
-```
-
-A lot can also become **BLOCKED** when required safety or verification conditions are not satisfied.
-
-This gives the material a stateful journey instead of treating analysis as a one-time prediction.
-
----
-
-## 🪪 Digital Material Passport
-
-The **Digital Material Passport** is the structured record representing a material lot.
-
-It can contain:
-
-- Lot ID
-- Material Category
-- Quantity
-- Condition
-- Battery Information
-- Hazard Information
-- AI Analysis Confidence
-- Evidence
-- Human Verification
-- Safety Status
-- Destination
-- Lifecycle State
-
-Example:
-
-```
-Lot: RL-1001
-Material: Battery
-Quantity: 1
-Battery: Yes
-Verification: Confirmed
-Safety: Approved for Handling
-Destination: SafeDisposal Pvt Ltd
-AI Verification: Amazon Bedrock
-```
-
-> **It is the structured source of truth for the material's journey.**
-
----
-
-## 🔎 Evidence Traceability
-
-ReRoute keeps the connection between:
-
-```
-Physical Evidence
-    ↓
-YOLO Detection
-    ↓
-Bedrock Interpretation
-    ↓
-Material Record
-    ↓
-Human Verification
-    ↓
-Safety Decision
-    ↓
-Routing
-```
-
-This makes it possible to understand not only **what the system decided**, but also **what evidence contributed to the decision**.
-
-> **Every important material decision should have a path back to its evidence.**
-
----
-
-## 🧑‍🔧 Collector Workflow
-
-**01 — Create a Lot**
-The collector creates a new material lot.
-
-**02 — Capture Evidence**
-Photos, voice notes and text descriptions can be attached.
-
-**03 — Analyze**
-ReRoute processes the available evidence using the YOLO and Bedrock intelligence layers.
-
-**04 — Review**
-Uncertain or safety-sensitive information is sent for human verification.
-
-**05 — Decide**
-Deterministic safety rules determine whether the material can proceed.
-
-**06 — Route**
-The system identifies compatible facilities using the routing constraints.
-
-**07 — Track**
-The lot moves through its lifecycle.
-
-**08 — Passport**
-A Digital Material Passport provides the structured record of the material.
-
----
-
-## 🏗️ AWS Architecture
-
-```
-COLLECTOR
-   │
-   Photo / Voice / Text
-   ▼
-┌──────────────────┐
-│  Amplify Hosting  │
-└─────────┬─────────┘
-          ▼
-┌──────────────────┐
-│   API Gateway     │
-└─────────┬─────────┘
-          ▼
-┌──────────────────┐
-│      Lambda       │
-└─────────┬─────────┘
-          │
-   ┌──────┼───────────┐
-   ▼      ▼            ▼
-   S3   DynamoDB   EventBridge
-   │      │              │
-   │      │              ▼
-   │      │        Step Functions
-   │      │              │
-   └──────┼──────────────┘
-          ▼
-┌──────────────────┐
-│  Amazon Bedrock   │
-└─────────┬─────────┘
-          ▼
-   Material Intelligence
-          ▼
-   Human Verification
-          ▼
-   Deterministic Rules
-          ▼
-       Routing
-          ▼
-Digital Material Passport
-```
-
-### AWS Services
-
-| AWS Service | Role |
-|---|---|
-| ☁️ Amplify Hosting | Hosts the ReRoute web application |
-| 🚪 API Gateway | Exposes backend APIs |
-| ⚡ Lambda | Runs backend logic |
-| 🗂️ S3 | Stores evidence and files |
-| 🗄️ DynamoDB | Stores material and lot records |
-| 🔔 EventBridge | Handles workflow events |
-| 🔄 Step Functions | Orchestrates processing workflows |
-| 🧠 Bedrock | Provides material intelligence |
-
----
-
-## 🛠️ Tech Stack
-
-**Frontend**
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-
-**AI / Computer Vision**
-- YOLO
-- OpenCV
-- FastAPI
-- Amazon Bedrock
-- AWS Nova Pro
-
-**Backend**
-- Next.js API routes
-- FastAPI
-- Python
-
-**AWS**
-- Amazon Bedrock
-- Amazon S3
-- Amazon DynamoDB
-- AWS Lambda
-- Amazon API Gateway
-- Amazon EventBridge
-- AWS Step Functions
-- AWS Amplify Hosting
-
-**Data & Documents**
-- DynamoDB
-- S3
-- Digital Material Passport
-- PDF generation
-
----
-
-## 🔐 Data & Security
-
-ReRoute is designed to keep sensitive configuration and evidence outside the source repository.
-
-Environment variables are stored locally or through deployment configuration.
-
-Sensitive files such as `.env` and `.env.local` are excluded from Git.
-
-Generated ML assets are also excluded:
-
-```
-dataset/
-runs/
-*.pt
-*.pth
-.venv/
-```
-
-The repository therefore contains the application and model integration code rather than local datasets, generated training outputs or credentials.
-
----
-
-## 🚧 Challenges
-
-**01 — E-waste is inherently messy**
-Real-world e-waste rarely arrives as clean individual objects. A single image can contain multiple objects, damaged components and incomplete information. This required a multimodal evidence approach rather than relying on one input.
-
-**02 — AI confidence is not enough**
-A high-confidence detection does not automatically mean a material is safe to handle. This led to the separation between AI Analysis → Uncertainty → Human Verification → Safety Rules.
-
-**03 — Routing requires constraints**
-Identifying an object is only the beginning. A facility also needs to be able to accept and safely process that material. This required routing based on deterministic facility capabilities.
-
-**04 — Traceability must survive the workflow**
-The evidence used for analysis should remain connected to the final material record. This led to the Digital Material Passport concept.
-
----
-
-## 🏆 What We Built
-
-ReRoute combines several stages into one operational workflow:
-
-```
-Messy E-Waste
-    ↓
-Capture
-    ↓
-YOLO Detection
-    ↓
-Bedrock Interpretation
-    ↓
-Structured Material Record
-    ↓
-Uncertainty
-    ↓
-Human Verification
-    ↓
-Safety Decision
-    ↓
-Facility Routing
-    ↓
-Lifecycle Tracking
-    ↓
-Digital Material Passport
-```
-
-> **Don't just identify the waste. Structure it well enough to make the next decision accountable.**
-
----
-
-## 🚀 Roadmap
-
-**Phase 1 — Prototype**
-- Multimodal material capture
-- YOLO object detection
-- Bedrock material analysis
-- Confidence and uncertainty
-- Human verification
-- Deterministic safety rules
-- Synthetic facility routing
-- Lifecycle tracking
-- Digital Material Passport
-
-**Phase 2 — Operational Data**
-- Real facility datasets
-- Real recycler acceptance criteria
-- Better material taxonomy
-- Expanded evidence types
-- Improved routing constraints
-- More robust model evaluation
-
-**Phase 3 — Real-World Validation**
-
-Validate the workflow with:
-- E-waste collectors
-- Aggregators
-- Authorized recyclers
-- Facility operators
-
-Measure:
-- Identification accuracy
-- Verification time
-- Routing accuracy
-- Material traceability
-- Operator usefulness
-
-**Phase 4 — Scale**
-- Larger recycler networks
-- Regional routing
-- Advanced material classification
-- Automated workflow orchestration
-- Longitudinal material traceability
-
----
-
-## ⚙️ Local Setup
-
-### Prerequisites
-
-- Node.js
-- Python 3.11+
-- npm
-- Git
-- AWS account with Amazon Bedrock access
-
-### Clone
-
-```bash
-git clone https://github.com/Marvickq/ReRoute.git
-cd ReRoute
-```
-
-### Frontend
-
-```bash
+------------------------------------------------------------------------
+
+## Prerequisites
+
+-   Git
+-   **Node.js:** use the version specified by the repository's `.nvmrc`,
+    `engines` field, or CI configuration if present.
+-   npm
+-   **Python 3.12** is the recommended baseline for the tested vision
+    environment; check the repository's Python constraints before using
+    a different version.
+-   A virtual environment for Python
+-   Optional AWS account and permissions for the integrations you intend
+    to test
+-   Sufficient disk space for PyTorch and model weights
+
+> On Windows, if `python` is not available, install Python from
+> python.org and enable the launcher/PATH option, or use the installed
+> interpreter's full path. Installing packages with `pip` does not
+> install Python itself.
+
+## Pinned dependencies
+
+Use the checked-in lockfiles as the source of truth for the web app.
+Install with `npm ci`, not `npm install`, to reproduce the lockfile.
+
+### Web dependencies
+
+``` powershell
 cd apps/web
-npm install
+npm ci
+```
+
+This requires a committed `package-lock.json`. If the lockfile is
+missing or out of sync with `package.json`, fix and commit it before
+claiming a reproducible build. Do not regenerate it casually during
+deployment.
+
+### Python dependencies
+
+Create a `reloop-yolo/requirements.txt` containing **exact versions**
+for every direct runtime dependency and commit it. The tested
+environment reported OpenCV package version `opencv-python==5.0.0.93`
+(OpenCV runtime reports `5.0.0`) and Ultralytics `8.4.155`; PyTorch was
+reported as `2.14.0+cpu` in that environment. Confirm these versions are
+available for your target Python/platform before pinning them,
+especially the PyTorch wheel index. Do not silently substitute different
+versions.
+
+Example install commands once the repository's pinned file is present:
+
+``` powershell
+cd reloop-yolo
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+macOS/Linux:
+
+``` bash
+cd reloop-yolo
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+**Reproducibility requirement:** a version mentioned in documentation is
+not a dependency pin unless it is in the committed
+requirements/lockfile. Check the actual lockfiles before release.
+
+------------------------------------------------------------------------
+
+## Local development
+
+Run the web app and vision API in separate terminals.
+
+### 1. Start the vision API
+
+``` powershell
+cd reloop-yolo
+.\.venv\Scripts\activate
+uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+The API should be reachable at `http://127.0.0.1:8000`. If the app
+exposes OpenAPI docs, check `http://127.0.0.1:8000/docs`.
+
+macOS/Linux:
+
+``` bash
+cd reloop-yolo
+source .venv/bin/activate
+uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+### 2. Configure and start the web app
+
+Create `apps/web/.env.local` (or the environment-file name actually read
+by this branch):
+
+``` env
+RELOOP_YOLO_API_URL=http://127.0.0.1:8000
+AWS_REGION=us-east-1
+AWS_BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0
+```
+
+Add S3/DynamoDB or other settings only if the corresponding integration
+is enabled. Prefer an AWS IAM role or a local AWS profile over
+long-lived access keys. Never commit credentials or `.env*` files.
+
+Then:
+
+``` powershell
+cd apps/web
+npm ci
 npm run dev
 ```
 
-The web application runs locally on:
+Open `http://localhost:3000`.
 
-```
-http://localhost:3000
-```
+> Environment variable names can differ by branch. Check the code and
+> deployment settings before assuming every variable above is consumed.
+> Do not expose AWS secrets through `NEXT_PUBLIC_*` variables.
 
-### YOLO API
+------------------------------------------------------------------------
 
-Create and activate the Python environment:
+## Configuration
 
-```bash
-python -m venv .venv
-```
+At minimum, configure and verify:
 
-Windows:
+  -----------------------------------------------------------------------
+  Setting                             Purpose
+  ----------------------------------- -----------------------------------
+  `RELOOP_YOLO_API_URL`               Base URL of the FastAPI vision
+                                      service
 
-```powershell
-.venv\Scripts\activate
-```
+  `AWS_REGION`                        Region for enabled AWS integrations
 
-Install dependencies:
+  `AWS_BEDROCK_MODEL_ID`              Bedrock model ID; Nova Pro is
+                                      configured as
+                                      `us.amazon.nova-pro-v1:0` in this
+                                      prototype
 
-```bash
-pip install fastapi uvicorn python-multipart boto3 python-dotenv ultralytics
-```
+  `YOLO_WEIGHTS`                      Optional path override for model
+                                      weights
 
-Start the YOLO API:
+  `INSPECTION_MAX_ITERATIONS`         Upper bound for the inspection loop
 
-```bash
-uvicorn api.main:app --reload --port 8000
-```
+  `QUALITY_*`                         Image-quality thresholds, where
+                                      supported
+  -----------------------------------------------------------------------
 
-The API runs on:
+The repository may define additional variables. Search the code and
+deployment dashboard for the authoritative list before production
+deployment.
 
-```
-http://127.0.0.1:8000
-```
+------------------------------------------------------------------------
 
-### Environment Variables
+## Tests and evaluation
 
-Create `apps/web/.env`:
+Run tests from the repository root. Confirm test paths and commands
+against the current branch.
 
-```env
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_REGION=us-east-1
-AWS_BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0
+### Python tests
 
-RELOOP_YOLO_API_URL=http://127.0.0.1:8000
-```
-
-> Never commit AWS credentials or `.env` files to GitHub.
-
----
-
-## 💭 The Bigger Idea
-
-The physical e-waste stream is messy. Formal recycling workflows require structured information.
-
-ReRoute creates the bridge:
-
-```
-Physical Material
-    ↓
-Digital Evidence
-    ↓
-Structured Intelligence
-    ↓
-Human Verification
-    ↓
-Controlled Decision
-    ↓
-Traceable Journey
+``` powershell
+cd reloop-yolo
+python -m pytest tests/ -q
 ```
 
-The goal is not simply to build another e-waste marketplace. It is to make the material itself **more understandable, verifiable and traceable** as it moves through the recycling journey.
+If `pytest` is not included in the pinned development dependencies,
+install it through the project's development requirements rather than
+adding an unpinned global package.
 
-> **ReRoute turns ambiguous physical e-waste into verified, routable, traceable material.**
+### Web tests
+
+The web integration has Node tests. If the repository's `package.json`
+defines a test script, run:
+
+``` powershell
+cd apps/web
+npm test
+```
+
+Otherwise inspect the scripts and test files and use the command
+declared by the project. Do not assume a test command passed unless you
+ran it and saw a successful exit code.
+
+### Build check
+
+``` powershell
+cd apps/web
+npm run build
+```
+
+Run the build after tests and before deployment. A test pass does not
+prove that the full Next.js app builds or that the end-to-end flow
+works.
+
+### Reported prototype evaluation
+
+The previous prototype run reported:
+
+-   33 Python tests passed.
+-   8 Node tests passed.
+-   Five original sample images were assessed; all five passed the
+    quality gate.
+-   Four of the five original-image cases required human review; one
+    reached ready-for-human-verification.
+-   Degraded blur/dark/low-resolution samples were rejected for retake
+    before detection in the tested cases.
+-   Full-loop median was approximately 1.6 seconds and maximum
+    approximately 2.2 seconds on the tested CPU environment; retake
+    short-circuit median was approximately 26 ms.
+
+These are **reported prototype results**, not a guarantee that the
+current checkout will reproduce them. The sample set is small and lacks
+ground-truth labels; precision, recall, and mAP were not established.
+The pretrained COCO weights performed poorly on e-waste classes, and the
+trained `best.pt` model was not present in the tested environment.
+Re-run evaluation and update these figures before submission.
+
+------------------------------------------------------------------------
+
+## Deployment
+
+### Web app --- AWS Amplify
+
+1.  Push the repository to the intended Git provider and select the
+    correct app/root directory (`apps/web`, if supported by the current
+    Amplify configuration).
+2.  Configure the build settings using the repository's actual package
+    manager and lockfile.
+3.  Add environment variables in Amplify's environment configuration;
+    never commit secrets.
+4.  Configure the public API URL for the vision service and ensure the
+    service allows requests from the deployed web origin.
+5.  Configure IAM permissions and service settings for each AWS
+    integration that should be live.
+6.  Deploy, then verify the deployed app and inspect build/runtime logs
+    in CloudWatch or the relevant hosting logs.
+
+### Vision service --- Render
+
+The FastAPI/OpenCV/YOLO service is currently separate from AWS and runs
+on Render.
+
+1.  Set the service root directory to `reloop-yolo` if that matches the
+    repository layout.
+2.  Install from the committed, pinned Python requirements file.
+3.  Configure the start command to the actual FastAPI module, for
+    example `uvicorn api.main:app --host 0.0.0.0 --port $PORT`.
+4.  Configure `YOLO_WEIGHTS` and any model asset required by the
+    detector. Ensure the weights are available to the deployed service
+    and licensing is understood.
+5.  Set `RELOOP_YOLO_API_URL` in the web app to the deployed HTTPS
+    service URL.
+6.  Verify health, CORS, upload size limits, timeouts, and error
+    handling using the deployed app.
+
+### AWS integrations
+
+-   Verify the correct AWS region, IAM permissions, Bedrock model
+    access, S3 bucket policies, DynamoDB tables, and event/workflow
+    resources.
+-   Test each integration in the target account. Modules or
+    infrastructure templates alone do not prove that a service is
+    deployed or working.
+-   Some services have demo/mock fallbacks when credentials or
+    configuration are absent. Make fallback status visible and do not
+    label mock execution as a successful live AWS call.
+-   The vision service is not AWS-hosted in the current deployment. Do
+    not describe the complete computer-vision pipeline as AWS-hosted
+    unless it has actually been moved and verified there.
+
+### End-to-end deployment smoke test
+
+1.  Create a test lot using non-sensitive sample evidence.
+2.  Upload a clear image and verify the quality-gate result.
+3.  Upload a deliberately blurred/dark image and confirm the retake
+    path.
+4.  Confirm detections and crops are tied to the source image.
+5.  Confirm uncertain detections require human review.
+6.  Attempt routing before required verification and confirm it is
+    blocked.
+7.  Complete the human review and verify that deterministic rules still
+    govern routing.
+8.  Inspect the lifecycle, passport, and audit entries.
+9.  Verify which persistence/services were genuinely live (not in-memory
+    or mock mode).
+10. Check logs for errors and ensure evidence endpoints are protected
+    before using real user data.
+
+------------------------------------------------------------------------
+
+## Limitations and responsible use
+
+-   This is a prototype, not a hazardous-material certification system.
+-   Visible-object detection cannot establish hidden chemistry, exact
+    mass, battery integrity, or safety.
+-   Human verification is required where the workflow marks uncertainty
+    or safety-sensitive evidence.
+-   Facility data is synthetic until replaced with verified, current
+    facility records. working on it
+-   A hash-linked audit trail can help detect later changes; it does not
+    by itself prove that the original input was true.
+
+
+
+
+## Project principle
+
+> **Don't just identify the waste. Structure it well enough to make the
+> next decision accountable.**
