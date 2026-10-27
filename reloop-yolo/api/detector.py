@@ -6,7 +6,7 @@ from ultralytics import YOLO
 # Limit PyTorch CPU threads to 1 to reduce RAM memory usage on Render (512MB limit)
 torch.set_num_threads(1)
 
-MODEL_PATH = "runs/detect/train-11/weights/best.pt"
+MODEL_PATH = os.getenv("YOLO_WEIGHTS", "runs/detect/train-11/weights/best.pt")
 
 _model = None
 
@@ -19,12 +19,18 @@ def get_model():
             _model = YOLO("yolov8n.pt")
     return _model
 
-def detect(image_path: str):
+def model_name() -> str:
+    """Weights actually loaded (or that will be loaded)."""
+    return os.path.basename(MODEL_PATH) if os.path.exists(MODEL_PATH) else "yolov8n.pt (pretrained COCO fallback)"
+
+
+def detect(image_path, conf=None):
+    """`image_path` may be a file path or a BGR numpy array. `conf` overrides the YOLO default (0.25)."""
     model = get_model()
     detections = []
 
     with torch.inference_mode():
-        results = model(image_path, verbose=False)
+        results = model(image_path, verbose=False, **({"conf": conf} if conf is not None else {}))
         for result in results:
             for box in result.boxes:
                 class_id = int(box.cls[0])

@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
-import os from "os";
+import { saveFileLocally } from "@/lib/evidence-files";
 import { storeEvidence } from "@/lib/store";
 import { isS3Configured, uploadToS3 } from "@/lib/s3";
 import { Evidence } from "@/types";
@@ -10,28 +7,6 @@ import { Evidence } from "@/types";
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 const ALLOWED_VOICE_TYPES = ["audio/webm", "audio/mp4", "audio/mpeg", "audio/wav", "audio/ogg", "audio/x-wav"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
-async function saveFileLocally(filename: string, buffer: Buffer): Promise<string> {
-  const primaryDir = path.join(process.cwd(), "uploads");
-  const tmpDir = path.join(os.tmpdir(), "uploads");
-
-  try {
-    if (!existsSync(primaryDir)) {
-      await mkdir(primaryDir, { recursive: true });
-    }
-    const filePath = path.join(primaryDir, filename);
-    await writeFile(filePath, buffer);
-    return filePath;
-  } catch {
-    // Fallback to OS temp directory for read-only serverless environments (e.g. AWS Amplify / Lambda)
-    if (!existsSync(tmpDir)) {
-      await mkdir(tmpDir, { recursive: true });
-    }
-    const tmpFilePath = path.join(tmpDir, filename);
-    await writeFile(tmpFilePath, buffer);
-    return tmpFilePath;
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {

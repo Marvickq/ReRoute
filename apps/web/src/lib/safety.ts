@@ -1,4 +1,5 @@
 import type { MaterialLot, SafetyResult } from "@/types";
+import { inspectionBlockers } from "./inspection-guard";
 
 const SAFETY_THRESHOLDS = {
   low_confidence_for_review: 0.7,
@@ -15,6 +16,11 @@ export function evaluateSafety(lot: MaterialLot): SafetyResult {
   const blockingReasons: string[] = [];
   const specialHandling: string[] = [];
   let requiresHumanReview = false;
+
+  // Unresolved visual-inspection findings block routing regardless of AI confidence.
+  const inspectionReasons = inspectionBlockers(lot);
+  blockingReasons.push(...inspectionReasons);
+  if (inspectionReasons.length > 0) requiresHumanReview = true;
 
   const hasBattery = lot.material_items.some((item) => item.battery_present);
   if (hasBattery) {

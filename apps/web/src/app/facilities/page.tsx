@@ -9,7 +9,7 @@ export default function FacilitiesPage() {
     <AppShell title="Facilities">
       <PageHeader
         title="Facilities"
-        description="Authorized e-waste recyclers registered with CPCB/MPCB."
+        description="SYNTHETIC DEMO DATA: example facilities hard-coded for demonstration. Not real, verified or authorized recyclers."
       />
 
       <div className="space-y-3">

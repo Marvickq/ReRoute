@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLotAsync, syncLotToCloud } from "@/lib/store";
 import { transitionLot, type LifecycleAction } from "@/lib/lifecycle";
+import { appendAudit } from "@/lib/audit";
 
 const VALID_ACTIONS: LifecycleAction[] = ["dispatch", "receive", "unblock"];
 
@@ -50,10 +51,30 @@ export async function POST(
 
   const result = transitionLot(lot, body.action as LifecycleAction, metadata);
 
+  const evidenceRefs = lot.inspection
+    ? [lot.inspection.source_evidence_id, ...lot.inspection.evidence_refs.map((r) => r.ref_id)]
+    : [];
   if (!result.success) {
+    appendAudit(lot, {
+      type: "enforcement_block",
+      actor: String(metadata.actor),
+      inspection_id: lot.inspection?.inspection_id,
+      evidence_refs: evidenceRefs,
+      summary: `Refused ${body.action}: ${result.error}`,
+      details: { from_status: result.from },
+    });
+    syncLotToCloud(lot);
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
+  appendAudit(lot, {
+    type: "human_approval",
+    actor: String(metadata.actor),
+    inspection_id: lot.inspection?.inspection_id,
+    evidence_refs: evidenceRefs,
+    summary: `Operator performed ${body.action} (${result.from} -> ${result.to})`,
+    details: { note: body.note ?? null, facility_id: metadata.facility_id ?? null },
+  });
   syncLotToCloud(lot);
 
   return NextResponse.json({

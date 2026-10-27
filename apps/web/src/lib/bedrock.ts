@@ -5,12 +5,20 @@ import os from "os";
 import type { Evidence, MaterialItem, HazardSignal, AnalysisResult } from "@/types";
 import { classifyUncertainty } from "./uncertainty";
 import { fetchFromS3 } from "./s3";
+import type { RawInspection, RawVisualEvidence } from "./inspection";
 
 const MODEL_ID =
   process.env.REROUTE_AWS_BEDROCK_MODEL_ID ||
   process.env.MY_AWS_BEDROCK_MODEL_ID ||
   process.env.AWS_BEDROCK_MODEL_ID ||
   "us.amazon.nova-pro-v1:0";
+
+const PLACEHOLDER_JPEG_B64 =
+  "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=";
+
+function isPlaceholderImage(buf: Buffer): boolean {
+  return buf.toString("base64") === PLACEHOLDER_JPEG_B64;
+}
 
 async function readFileBuffer(filename: string, url?: string, s3Key?: string): Promise<Buffer> {
   if (filename.startsWith("data:")) {
@@ -57,11 +65,9 @@ async function readFileBuffer(filename: string, url?: string, s3Key?: string): P
     } catch {}
   }
 
-  // 6. Fallback: Return 1x1 JPEG buffer so YOLO / Bedrock analysis NEVER fails due to missing local files on AWS Amplify
-  return Buffer.from(
-    "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
-    "base64"
-  );
+  // 6. Fallback: 1x1 JPEG placeholder so the Bedrock path never throws on missing files.
+  //    tryYoloAnalysis detects it (isPlaceholderImage) and does NOT treat it as a real photo.
+  return Buffer.from(PLACEHOLDER_JPEG_B64, "base64");
 }
 
 const ANALYSIS_PROMPT = `You are an e-waste material analysis system. Analyze the provided evidence (photos, text descriptions, voice transcriptions) and extract structured material intelligence.
@@ -405,7 +411,7 @@ function generateMockAnalysis(
     items,
     hazard_signals: hazardSignals,
     analyzed_at: new Date().toISOString(),
-    model_used: (process.env.MY_YOLO_API_URL || process.env.YOLO_API_URL) ? "yolov8n + amazon-nova" : (isConfigured() ? MODEL_ID : "mock-analysis"),
+    model_used: isConfigured() ? MODEL_ID : "mock-analysis",
   };
 }
 
@@ -460,10 +466,19 @@ function getYoloUrl(): string {
   return rawUrl;
 }
 
+export interface YoloOutcome {
+  analysis: AnalysisResult;
+  inspection: RawInspection | null;
+  visual: RawVisualEvidence | null;
+  source: Evidence;
+  /** What the service actually used to interpret detections: "amazon-bedrock" or "detection-fallback". */
+  interpretation_source: string | null;
+}
+
 async function tryYoloAnalysis(
   evidence: Evidence[],
   lotId: string
-): Promise<AnalysisResult | null> {
+): Promise<YoloOutcome | null> {
   const yoloUrl = getYoloUrl();
   if (!yoloUrl) return null;
   const photo = evidence.find((e) => e.type === "photo");
@@ -471,6 +486,10 @@ async function tryYoloAnalysis(
 
   try {
     const fileBuffer = await readFileBuffer(photo.filename, photo.url, photo.s3_key);
+    if (isPlaceholderImage(fileBuffer)) {
+      console.warn(`[YOLO API] Evidence image ${photo.evidence_id} is not readable by the server; skipping inspection`);
+      return null;
+    }
     const formData = new FormData();
     const blob = new Blob([new Uint8Array(fileBuffer)], { type: photo.mime_type || "image/jpeg" });
     formData.append("file", blob, photo.original_filename);
@@ -503,18 +522,26 @@ async function tryYoloAnalysis(
     let items = mapItems(data.bedrock.items || [], lotId, evidenceIds);
     let hazardSignals = mapHazardSignals(data.bedrock.hazard_signals || [], lotId, evidenceIds);
 
-    if (items.length === 0 && hazardSignals.length === 0) {
+    const inspection: RawInspection | null = data.inspection ?? null;
+    // With an inspection verdict, empty detections are reported as empty (never replaced by mock items).
+    if (items.length === 0 && hazardSignals.length === 0 && !inspection) {
       const fallback = generateMockAnalysis(evidence, null, lotId);
       items = fallback.items;
       hazardSignals = fallback.hazard_signals;
     }
 
     return {
-      lot_id: lotId,
-      items,
-      hazard_signals: hazardSignals,
-      analyzed_at: new Date().toISOString(),
-      model_used: "yolov8n + amazon-nova",
+      analysis: {
+        lot_id: lotId,
+        items,
+        hazard_signals: hazardSignals,
+        analyzed_at: new Date().toISOString(),
+        model_used: `${inspection?.detector ?? "yolo"} + ${data.bedrock?.source === "amazon-bedrock" ? "amazon-bedrock" : "detection-fallback"}`,
+      },
+      inspection,
+      visual: data.visual_evidence ?? null,
+      source: photo,
+      interpretation_source: data.bedrock?.source ?? null,
     };
   } catch (err) {
     console.warn("[YOLO API Warning] Could not reach YOLO microservice, falling back to direct Bedrock:", err);
@@ -527,15 +554,38 @@ export async function analyzeLot(
   textDescription: string | null,
   lotId: string
 ): Promise<AnalysisResult> {
+  return (await analyzeLotWithInspection(evidence, textDescription, lotId)).analysis;
+}
+
+/** Same as analyzeLot, but also returns the OpenCV inspection payload when the YOLO service produced one. */
+export async function analyzeLotWithInspection(
+  evidence: Evidence[],
+  textDescription: string | null,
+  lotId: string
+): Promise<Pick<YoloOutcome, "analysis" | "inspection" | "visual" | "source" | "interpretation_source">> {
   if (evidence.length === 0 && !textDescription) {
     throw new Error("No evidence to analyze. At least one evidence item or text description is required.");
   }
 
-  const evidenceIds = evidence.map((e) => e.evidence_id);
-
   // Try YOLO microservice if configured
-  const yoloResult = await tryYoloAnalysis(evidence, lotId);
-  if (yoloResult) return yoloResult;
+  const yolo = await tryYoloAnalysis(evidence, lotId);
+  if (yolo) return yolo;
+
+  return {
+    analysis: await analyzeLotFallback(evidence, textDescription, lotId),
+    inspection: null,
+    visual: null,
+    source: evidence.find((e) => e.type === "photo") as Evidence,
+    interpretation_source: null,
+  };
+}
+
+async function analyzeLotFallback(
+  evidence: Evidence[],
+  textDescription: string | null,
+  lotId: string
+): Promise<AnalysisResult> {
+  const evidenceIds = evidence.map((e) => e.evidence_id);
 
   if (!isConfigured()) {
     console.log("Bedrock not configured — using mock analysis");
@@ -621,7 +671,7 @@ export async function analyzeLot(
       items,
       hazard_signals: hazardSignals,
       analyzed_at: new Date().toISOString(),
-      model_used: (process.env.MY_YOLO_API_URL || process.env.YOLO_API_URL) ? "yolov8n + amazon-nova" : MODEL_ID,
+      model_used: MODEL_ID,
     };
   } catch (err) {
     console.warn("[Bedrock Warning] Direct Bedrock invocation failed, falling back to heuristic analysis:", err);

@@ -3,6 +3,7 @@ import { getLotAsync, storeSafetyResult, storeRoutingResult, syncLotToCloud } fr
 import { evaluateSafety } from "@/lib/safety";
 import { evaluateRouting } from "@/lib/routing";
 import { transitionLot, autoApproveVerifications } from "@/lib/lifecycle";
+import { appendAudit } from "@/lib/audit";
 
 export async function GET(
   _request: NextRequest,
@@ -26,12 +27,32 @@ export async function GET(
   const safety = evaluateSafety(lot);
   storeSafetyResult(safety);
 
+  // Audit: link the routing decision to the inspection and the evidence it rests on.
+  const insp = lot.inspection;
+  const evidenceRefs = insp ? [insp.source_evidence_id, ...insp.evidence_refs.map((r) => r.ref_id)] : lot.evidence.map((e) => e.evidence_id);
+  const auditRouting = (decision: string, extra: Record<string, unknown>) =>
+    appendAudit(lot, {
+      type: "routing_decision",
+      actor: "system:routing-engine",
+      inspection_id: insp?.inspection_id,
+      evidence_refs: evidenceRefs,
+      summary: `Routing ${decision}`,
+      details: {
+        inspection_outcome: insp?.outcome ?? null,
+        inspection_resolved_by: insp?.resolution?.resolved_by ?? null,
+        safety_blocked: safety.blocked,
+        blocking_reasons: safety.blocking_reasons,
+        ...extra,
+      },
+    });
+
   // If safety evaluation flags hazardous conditions, mark lot as blocked and display unblock action
   if (safety.blocked && lot.status !== "routed" && lot.status !== "dispatched" && lot.status !== "received") {
     transitionLot(lot, "block", {
       reasons: safety.blocking_reasons,
       actor: "system",
     });
+    auditRouting("blocked", {});
     syncLotToCloud(lot);
     return NextResponse.json({ safety, routing: null, lot });
   }
@@ -54,6 +75,10 @@ export async function GET(
     lot.status = "routed";
   }
 
+  auditRouting(routing.recommended_facility_id && !routing.routing_blocked ? "approved" : "not approved", {
+    recommended_facility_id: routing.recommended_facility_id,
+    routing_blocked: routing.routing_blocked,
+  });
   syncLotToCloud(lot);
 
   return NextResponse.json({

@@ -1,5 +1,6 @@
 import type { Facility, FacilityEligibility } from "@/types";
 
+// SYNTHETIC DEMO DATA: these facilities are hard-coded examples, not real or verified recyclers.
 export const FACILITIES: Facility[] = [
   {
     facility_id: "FAC-001",

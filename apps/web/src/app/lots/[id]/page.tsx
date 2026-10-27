@@ -6,6 +6,7 @@ import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
+import InspectionPanel from "@/components/InspectionPanel";
 import type { MaterialLot, Evidence, MaterialItem, HazardSignal, UncertaintyLevel, SafetyResult, RoutingResult, FacilityEligibility } from "@/types";
 import { FACILITIES } from "@/lib/facilities";
 import { getLifecycleSteps, areAllRequiredObservationsVerified } from "@/lib/lifecycle";
@@ -62,6 +63,7 @@ export default function LotDetailPage() {
         throw new Error(data.error || "Analysis failed");
       }
       setLot((prev) => (prev ? { ...prev, status: "analyzed", analysis: data.analysis, material_items: data.analysis.items, hazard_signals: data.analysis.hazard_signals } : prev));
+      await fetchLot(); // pick up inspection record, lot status and derived evidence
     } catch (err) {
       setAnalysisError(err instanceof Error ? err.message : "Analysis failed");
       setLot((prev) => (prev ? { ...prev, status: "analysis_failed" } : prev));
@@ -313,6 +315,8 @@ export default function LotDetailPage() {
               </p>
             </div>
           )}
+
+          <InspectionPanel lot={lot} onChanged={fetchLot} onReanalyze={handleAnalyze} />
 
           {/* AI Material Understanding */}
           <div className="bg-[#111] border border-[#2a2a2a] rounded-lg p-5">

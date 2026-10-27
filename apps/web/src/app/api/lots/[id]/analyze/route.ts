@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLotAsync, storeAnalysis } from "@/lib/store";
-import { analyzeLot } from "@/lib/bedrock";
+import { analyzeLot, analyzeLotWithInspection } from "@/lib/bedrock";
+import { attachInspection, buildUnavailableInspection, inspectionBlockers, recordInspection } from "@/lib/inspection";
 import { transitionLot, areAllRequiredObservationsVerified } from "@/lib/lifecycle";
 
 export async function POST(
@@ -42,12 +43,27 @@ export async function POST(
   }
 
   try {
-    const result = await analyzeLot(lot.evidence, description, id);
+    const outcome = await analyzeLotWithInspection(lot.evidence, description, id);
+    const result = outcome.analysis;
     storeAnalysis(result);
     lot.status = "analyzed";
 
+    // Record the OpenCV inspection. A photo with no inspection result (service unreachable / image
+    // unreadable) is recorded as "unavailable" and blocks routing until a human resolves it.
+    const photo = lot.evidence.find((e) => e.type === "photo");
+    if (outcome.inspection && photo) {
+      await recordInspection(lot, outcome.source ?? photo, outcome.inspection, outcome.visual);
+    } else if (photo) {
+      attachInspection(
+        lot,
+        buildUnavailableInspection(id, photo.evidence_id, "visual inspection could not run (YOLO/OpenCV service unreachable, timed out, or image unreadable)")
+      );
+    }
+
     const allVerified = areAllRequiredObservationsVerified(lot);
-    if (allVerified) {
+    if (inspectionBlockers(lot).length > 0) {
+      transitionLot(lot, "review");
+    } else if (allVerified) {
       transitionLot(lot, "verify", { decision: "confirmed", actor: "system" });
     } else {
       const needsReview = (lot.material_items || []).some(

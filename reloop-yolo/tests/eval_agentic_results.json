@@ -1,0 +1,165 @@
+{
+  "opencv": "5.0.0",
+  "detector": "yolov8n.pt (pretrained COCO fallback)",
+  "rows": [
+    {
+      "case": "A clear (real photo, real YOLO)",
+      "outcome": "READY_FOR_HUMAN_VERIFICATION",
+      "routing_blocked": false,
+      "actions": [
+        "run_detection",
+        "proceed_to_human_verification"
+      ],
+      "tools": [
+        "opencv.assess_image_quality",
+        "yolo.detect"
+      ],
+      "evidence_requests": [
+        "Recommended: add a photo of the back / battery compartment of the cell phone (battery condition is not visible from this view)."
+      ],
+      "detections": [
+        [
+          "cell phone",
+          0.6747
+        ]
+      ],
+      "latency_ms": 701.6
+    },
+    {
+      "case": "B blurry (real photo + synthetic blur)",
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "tools": [
+        "opencv.assess_image_quality"
+      ],
+      "evidence_requests": [
+        "Hold the camera steady and tap to focus on the material, then retake."
+      ],
+      "detections": [],
+      "latency_ms": 178.2
+    },
+    {
+      "case": "C ambiguous (real photo, low-confidence real detections)",
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "inspect_crop",
+        "inspect_crop",
+        "request_human_review"
+      ],
+      "tools": [
+        "opencv.assess_image_quality",
+        "yolo.detect",
+        "opencv.crop_upscale",
+        "yolo.detect",
+        "opencv.crop_upscale",
+        "yolo.detect"
+      ],
+      "evidence_requests": [],
+      "detections": [
+        [
+          "remote",
+          0.3165
+        ],
+        [
+          "bicycle",
+          0.2898
+        ]
+      ],
+      "latency_ms": 1934.9
+    },
+    {
+      "case": "D nothing detected (real photo)",
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "request_human_review"
+      ],
+      "tools": [
+        "opencv.assess_image_quality",
+        "yolo.detect"
+      ],
+      "evidence_requests": [],
+      "detections": [],
+      "latency_ms": 676.4
+    },
+    {
+      "case": "E truncated view (real photo cropped so phone is cut at top)",
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "request_targeted_retake"
+      ],
+      "tools": [
+        "opencv.assess_image_quality",
+        "yolo.detect"
+      ],
+      "evidence_requests": [
+        "The cell phone is cut off at the top edge; retake from further away so the whole object is in frame."
+      ],
+      "detections": [
+        [
+          "cell phone",
+          0.714
+        ]
+      ],
+      "latency_ms": 548.4
+    },
+    {
+      "case": "F safety-critical, uncertain (SCRIPTED detector)",
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "inspect_crop",
+        "request_targeted_retake"
+      ],
+      "tools": [
+        "opencv.assess_image_quality",
+        "yolo.detect",
+        "opencv.crop_upscale",
+        "yolo.detect"
+      ],
+      "evidence_requests": [
+        "Take a well-lit close-up of the suspected battery (fill the frame, include any labels and visible swelling/damage)."
+      ],
+      "detections": [
+        [
+          "battery",
+          0.3
+        ]
+      ],
+      "latency_ms": 49.9
+    },
+    {
+      "case": "G safety-critical, confident (SCRIPTED detector)",
+      "outcome": "READY_FOR_HUMAN_VERIFICATION",
+      "routing_blocked": false,
+      "actions": [
+        "run_detection",
+        "proceed_to_human_verification"
+      ],
+      "tools": [
+        "opencv.assess_image_quality",
+        "yolo.detect"
+      ],
+      "evidence_requests": [
+        "Recommended: add a photo of the back / battery compartment of the battery (battery condition is not visible from this view)."
+      ],
+      "detections": [
+        [
+          "battery",
+          0.95
+        ]
+      ],
+      "latency_ms": 45.9
+    }
+  ],
+  "distinct_action_sequences_A_to_F": 6
+}

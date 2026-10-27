@@ -32,7 +32,116 @@ export type EventType =
   | "lot_dispatched"
   | "lot_received"
   | "lot_blocked"
-  | "lot_unblocked";
+  | "lot_unblocked"
+  | "inspection_completed"
+  | "inspection_resolved"
+  | "inspection_retake_requested";
+
+export type InspectionOutcome =
+  | "READY_FOR_HUMAN_VERIFICATION"
+  | "HUMAN_REVIEW_REQUIRED"
+  | "RETAKE_REQUIRED";
+
+export interface InspectionEvidenceRef {
+  ref_id: string;
+  kind: "annotated" | "crop";
+  lot_id: string;
+  source_evidence_id: string;
+  filename: string;
+  url: string;
+  s3_key?: string;
+  label?: string;
+  confidence?: number;
+  bbox?: number[];
+  created_at: string;
+}
+
+export interface InspectionToolCall {
+  tool: string;
+  args: Record<string, unknown>;
+  result: unknown;
+  latency_ms: number;
+}
+
+export interface InspectionStep {
+  iteration: number;
+  timestamp: string;
+  observation: Record<string, unknown>;
+  decision: string;
+  action: string;
+  tool_calls: InspectionToolCall[];
+  outcome: string;
+  latency_ms: number;
+}
+
+export interface EvidenceRequest {
+  kind: "quality_retake" | "wider_view" | "close_up" | "missing_view";
+  instruction: string;
+  reason: string;
+  blocking?: boolean;
+  target_class?: string;
+  target_bbox?: number[];
+  check?: string;
+}
+
+export type AuditEntryType =
+  | "observation"
+  | "decision"
+  | "tool_call"
+  | "action"
+  | "result"
+  | "inspection_outcome"
+  | "human_approval"
+  | "retake"
+  | "enforcement_block"
+  | "routing_decision";
+
+/** Append-only, hash-chained record; see lib/audit.ts. */
+export interface AuditEntry {
+  seq: number;
+  timestamp: string;
+  actor: string;
+  type: AuditEntryType;
+  inspection_id?: string;
+  summary: string;
+  details: Record<string, unknown>;
+  evidence_refs: string[];
+  prev_hash: string;
+  hash: string;
+}
+
+export interface InspectionResolution {
+  resolved_by: string;
+  resolved_at: string;
+  note: string;
+}
+
+export interface InspectionRecord {
+  inspection_id: string;
+  lot_id: string;
+  source_evidence_id: string;
+  outcome: InspectionOutcome;
+  /** Image-quality gate result: ACCEPT | RETAKE_REQUIRED | MANUAL_REVIEW */
+  quality_status: string | null;
+  quality_metrics: Record<string, number>;
+  reasons: string[];
+  routing_blocked: boolean;
+  blocking_reasons: string[];
+  steps: InspectionStep[];
+  evidence_requests: EvidenceRequest[];
+  iterations: number;
+  max_iterations: number | null;
+  detections: Array<{ class_name: string; confidence: number; bbox: number[]; crop_confirmed?: boolean; uncertain?: boolean }>;
+  evidence_refs: InspectionEvidenceRef[];
+  opencv_version: string | null;
+  detector: string | null;
+  service_available: boolean;
+  total_ms: number | null;
+  started_at: string;
+  finished_at: string;
+  /** Set only by a human via the backend; AI output is never a verification. */
+  resolution: InspectionResolution | null;
+}
 
 export interface Verification {
   verification_id: string;
@@ -153,6 +262,9 @@ export interface MaterialLot {
   routing_result: RoutingResult | null;
   events: Event[];
   verifications: Verification[];
+  inspection?: InspectionRecord | null;
+  inspection_history?: InspectionRecord[];
+  audit_trail?: AuditEntry[];
   dispatched_at: string | null;
   received_at: string | null;
 }

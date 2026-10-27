@@ -1,4 +1,5 @@
 import type { LotStatus, MaterialLot, Event } from "@/types";
+import { inspectionBlockers } from "./inspection-guard";
 
 export type LifecycleAction =
   | "analyze"
@@ -65,6 +66,20 @@ export function transitionLot(
 
   if (action === "unblock") {
     return handleUnblock(lot, metadata);
+  }
+
+  // Backend enforcement: an unresolved inspection blocks every routing-side transition.
+  if (action === "route" || action === "dispatch" || action === "receive") {
+    const blockers = inspectionBlockers(lot);
+    if (blockers.length > 0) {
+      return {
+        success: false,
+        from: currentStatus,
+        to: null,
+        event: null,
+        error: `Blocked by visual inspection: ${blockers.join("; ")}`,
+      };
+    }
   }
 
   const targetStatus = ACTION_TO_STATUS[action];
@@ -160,6 +175,17 @@ function handleUnblock(lot: MaterialLot, metadata: Record<string, unknown>): Tra
       to: null,
       event: null,
       error: `Cannot unblock from ${currentStatus}`,
+    };
+  }
+
+  const inspectionReasons = inspectionBlockers(lot);
+  if (inspectionReasons.length > 0) {
+    return {
+      success: false,
+      from: currentStatus,
+      to: null,
+      event: null,
+      error: `Cannot unblock: visual inspection unresolved (${inspectionReasons.join("; ")})`,
     };
   }
 

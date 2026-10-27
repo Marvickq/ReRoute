@@ -1,0 +1,574 @@
+{
+  "opencv": "5.0.0",
+  "detector": "yolov8n.pt (pretrained COCO fallback)",
+  "cases": 25,
+  "rows": [
+    {
+      "image": "computers_pallets.jpg",
+      "variant": "original",
+      "quality_status": "ACCEPT",
+      "quality_reasons": [],
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "enhance_and_redetect",
+        "request_human_review"
+      ],
+      "detections": [],
+      "latency_ms": 902.2
+    },
+    {
+      "image": "computers_pallets.jpg",
+      "variant": "synthetic_blur",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image appears blurry (sharpness score 2.2) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 6.9
+    },
+    {
+      "image": "computers_pallets.jpg",
+      "variant": "synthetic_dark",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image appears blurry (sharpness score 33.5) [MANUAL_REVIEW]",
+        "Image is too dark (mean brightness 11/255) [RETAKE_REQUIRED]",
+        "85% of pixels are near-black [RETAKE_REQUIRED]",
+        "Very low contrast (std 12.1) [MANUAL_REVIEW]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 7.7
+    },
+    {
+      "image": "computers_pallets.jpg",
+      "variant": "synthetic_dim",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image is too dark (mean brightness 32/255) [RETAKE_REQUIRED]",
+        "61% of pixels are near-black [MANUAL_REVIEW]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 6.8
+    },
+    {
+      "image": "computers_pallets.jpg",
+      "variant": "synthetic_lowres",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Low resolution (200x267) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 2.7
+    },
+    {
+      "image": "junk_separation_2.jpg",
+      "variant": "original",
+      "quality_status": "ACCEPT",
+      "quality_reasons": [],
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "request_human_review"
+      ],
+      "detections": [],
+      "latency_ms": 132.6
+    },
+    {
+      "image": "junk_separation_2.jpg",
+      "variant": "synthetic_blur",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image appears blurry (sharpness score 5.1) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 12.9
+    },
+    {
+      "image": "junk_separation_2.jpg",
+      "variant": "synthetic_dark",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image is too dark (mean brightness 15/255) [RETAKE_REQUIRED]",
+        "82% of pixels are near-black [RETAKE_REQUIRED]",
+        "Very low contrast (std 9.3) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 14.3
+    },
+    {
+      "image": "junk_separation_2.jpg",
+      "variant": "synthetic_dim",
+      "quality_status": "MANUAL_REVIEW",
+      "quality_reasons": [
+        "Image is too dark (mean brightness 46/255) [MANUAL_REVIEW]"
+      ],
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "enhance_and_redetect",
+        "request_human_review"
+      ],
+      "detections": [],
+      "latency_ms": 435.8
+    },
+    {
+      "image": "junk_separation_2.jpg",
+      "variant": "synthetic_lowres",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Low resolution (200x266) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 4.7
+    },
+    {
+      "image": "junk_separation_4.jpg",
+      "variant": "original",
+      "quality_status": "ACCEPT",
+      "quality_reasons": [],
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "request_human_review"
+      ],
+      "detections": [],
+      "latency_ms": 249.1
+    },
+    {
+      "image": "junk_separation_4.jpg",
+      "variant": "synthetic_blur",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image appears blurry (sharpness score 3.6) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 57.8
+    },
+    {
+      "image": "junk_separation_4.jpg",
+      "variant": "synthetic_dark",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image appears blurry (sharpness score 11.4) [RETAKE_REQUIRED]",
+        "Image is too dark (mean brightness 20/255) [RETAKE_REQUIRED]",
+        "53% of pixels are near-black [MANUAL_REVIEW]",
+        "Very low contrast (std 9.8) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 38.0
+    },
+    {
+      "image": "junk_separation_4.jpg",
+      "variant": "synthetic_dim",
+      "quality_status": "ACCEPT",
+      "quality_reasons": [],
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "enhance_and_redetect",
+        "inspect_crop",
+        "request_human_review"
+      ],
+      "detections": [
+        [
+          "cake",
+          0.3428
+        ]
+      ],
+      "latency_ms": 1998.9
+    },
+    {
+      "image": "junk_separation_4.jpg",
+      "variant": "synthetic_lowres",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Low resolution (200x266) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 10.1
+    },
+    {
+      "image": "phone_scrap.jpg",
+      "variant": "original",
+      "quality_status": "ACCEPT",
+      "quality_reasons": [],
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "inspect_crop",
+        "inspect_crop",
+        "request_human_review"
+      ],
+      "detections": [
+        [
+          "remote",
+          0.3165
+        ],
+        [
+          "bicycle",
+          0.2898
+        ]
+      ],
+      "latency_ms": 2156.0
+    },
+    {
+      "image": "phone_scrap.jpg",
+      "variant": "synthetic_blur",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image appears blurry (sharpness score 2.8) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 23.4
+    },
+    {
+      "image": "phone_scrap.jpg",
+      "variant": "synthetic_dark",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image is too dark (mean brightness 14/255) [RETAKE_REQUIRED]",
+        "84% of pixels are near-black [RETAKE_REQUIRED]",
+        "Very low contrast (std 9.1) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 21.6
+    },
+    {
+      "image": "phone_scrap.jpg",
+      "variant": "synthetic_dim",
+      "quality_status": "MANUAL_REVIEW",
+      "quality_reasons": [
+        "Image is too dark (mean brightness 44/255) [MANUAL_REVIEW]"
+      ],
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "enhance_and_redetect",
+        "inspect_crop",
+        "inspect_crop",
+        "request_human_review"
+      ],
+      "detections": [
+        [
+          "remote",
+          0.425
+        ],
+        [
+          "bicycle",
+          0.2896
+        ]
+      ],
+      "latency_ms": 2175.7
+    },
+    {
+      "image": "phone_scrap.jpg",
+      "variant": "synthetic_lowres",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Low resolution (267x200) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 10.1
+    },
+    {
+      "image": "smartphone_blackview.jpg",
+      "variant": "original",
+      "quality_status": "ACCEPT",
+      "quality_reasons": [],
+      "outcome": "READY_FOR_HUMAN_VERIFICATION",
+      "routing_blocked": false,
+      "actions": [
+        "run_detection",
+        "proceed_to_human_verification"
+      ],
+      "detections": [
+        [
+          "cell phone",
+          0.6747
+        ]
+      ],
+      "latency_ms": 497.2
+    },
+    {
+      "image": "smartphone_blackview.jpg",
+      "variant": "synthetic_blur",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image appears blurry (sharpness score 2.0) [RETAKE_REQUIRED]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 23.4
+    },
+    {
+      "image": "smartphone_blackview.jpg",
+      "variant": "synthetic_dark",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Image appears blurry (sharpness score 40.2) [MANUAL_REVIEW]",
+        "Image is too dark (mean brightness 15/255) [RETAKE_REQUIRED]",
+        "63% of pixels are near-black [MANUAL_REVIEW]",
+        "Very low contrast (std 12.2) [MANUAL_REVIEW]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 25.7
+    },
+    {
+      "image": "smartphone_blackview.jpg",
+      "variant": "synthetic_dim",
+      "quality_status": "MANUAL_REVIEW",
+      "quality_reasons": [
+        "Image is too dark (mean brightness 46/255) [MANUAL_REVIEW]"
+      ],
+      "outcome": "HUMAN_REVIEW_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "run_detection",
+        "inspect_crop",
+        "inspect_crop",
+        "request_human_review"
+      ],
+      "detections": [
+        [
+          "cell phone",
+          0.4443
+        ],
+        [
+          "microwave",
+          0.2898
+        ]
+      ],
+      "latency_ms": 1513.9
+    },
+    {
+      "image": "smartphone_blackview.jpg",
+      "variant": "synthetic_lowres",
+      "quality_status": "RETAKE_REQUIRED",
+      "quality_reasons": [
+        "Low resolution (267x200) [RETAKE_REQUIRED]",
+        "Image appears blurry (sharpness score 48.6) [MANUAL_REVIEW]"
+      ],
+      "outcome": "RETAKE_REQUIRED",
+      "routing_blocked": true,
+      "actions": [
+        "request_retake"
+      ],
+      "detections": [],
+      "latency_ms": 9.7
+    }
+  ],
+  "clahe_comparison": [
+    {
+      "image": "computers_pallets.jpg",
+      "variant": "original",
+      "raw": [],
+      "clahe": []
+    },
+    {
+      "image": "computers_pallets.jpg",
+      "variant": "synthetic_dim",
+      "raw": [],
+      "clahe": []
+    },
+    {
+      "image": "computers_pallets.jpg",
+      "variant": "synthetic_dark",
+      "raw": [],
+      "clahe": []
+    },
+    {
+      "image": "junk_separation_2.jpg",
+      "variant": "original",
+      "raw": [],
+      "clahe": []
+    },
+    {
+      "image": "junk_separation_2.jpg",
+      "variant": "synthetic_dim",
+      "raw": [],
+      "clahe": []
+    },
+    {
+      "image": "junk_separation_2.jpg",
+      "variant": "synthetic_dark",
+      "raw": [],
+      "clahe": []
+    },
+    {
+      "image": "junk_separation_4.jpg",
+      "variant": "original",
+      "raw": [],
+      "clahe": [
+        "cake"
+      ]
+    },
+    {
+      "image": "junk_separation_4.jpg",
+      "variant": "synthetic_dim",
+      "raw": [],
+      "clahe": [
+        "cake"
+      ]
+    },
+    {
+      "image": "junk_separation_4.jpg",
+      "variant": "synthetic_dark",
+      "raw": [],
+      "clahe": []
+    },
+    {
+      "image": "phone_scrap.jpg",
+      "variant": "original",
+      "raw": [
+        "bicycle",
+        "remote"
+      ],
+      "clahe": [
+        "remote"
+      ]
+    },
+    {
+      "image": "phone_scrap.jpg",
+      "variant": "synthetic_dim",
+      "raw": [],
+      "clahe": [
+        "bicycle",
+        "remote"
+      ]
+    },
+    {
+      "image": "phone_scrap.jpg",
+      "variant": "synthetic_dark",
+      "raw": [],
+      "clahe": [
+        "car"
+      ]
+    },
+    {
+      "image": "smartphone_blackview.jpg",
+      "variant": "original",
+      "raw": [
+        "cell phone"
+      ],
+      "clahe": [
+        "cell phone"
+      ]
+    },
+    {
+      "image": "smartphone_blackview.jpg",
+      "variant": "synthetic_dim",
+      "raw": [
+        "cell phone",
+        "microwave"
+      ],
+      "clahe": [
+        "cell phone",
+        "suitcase"
+      ]
+    },
+    {
+      "image": "smartphone_blackview.jpg",
+      "variant": "synthetic_dark",
+      "raw": [
+        "cell phone",
+        "microwave"
+      ],
+      "clahe": [
+        "cell phone",
+        "microwave"
+      ]
+    }
+  ],
+  "latency_ms_full_loop_with_detection": {
+    "n": 9,
+    "median": 902.2,
+    "max": 2175.7
+  },
+  "latency_ms_retake_short_circuit": {
+    "n": 16,
+    "median": 11.5
+  },
+  "note": "CPU, single thread, no ground truth: counts/outcomes only; no accuracy claimed."
+}

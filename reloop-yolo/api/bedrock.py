@@ -90,7 +90,8 @@ def generate_fallback_intelligence(detections: List[Dict[str, Any]]) -> Dict[str
 
     return {
         "items": items,
-        "hazard_signals": []
+        "hazard_signals": [],
+        "source": "detection-fallback"
     }
 
 # --------------------------------------------------
@@ -191,6 +192,7 @@ Rules:
             if json_match:
                 material_intelligence = json.loads(json_match)
                 if isinstance(material_intelligence, dict) and "items" in material_intelligence:
+                    material_intelligence["source"] = "amazon-bedrock"
                     return material_intelligence
 
         print("[YOLO API Warning] Bedrock response parsing failed, using fallback")
